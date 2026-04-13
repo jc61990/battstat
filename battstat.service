@@ -34,12 +34,12 @@ ProtectHome=yes
 ReadWritePaths=/opt/battstat/data
 CapabilityBoundingSet=
 AmbientCapabilities=
-SystemCallFilter=@system-service
-SystemCallErrorNumber=EPERM
+# SystemCallFilter and MemoryDenyWriteExecute are intentionally omitted:
+# Node.js/V8 requires W+X memory pages for JIT compilation — these flags
+# kill the process with SIGTRAP on modern kernels.
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 RestrictNamespaces=yes
 LockPersonality=yes
-MemoryDenyWriteExecute=yes
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
