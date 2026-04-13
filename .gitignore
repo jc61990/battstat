@@ -33,4 +33,4 @@ dist/
 build/
 
 # Backups produced by upgrade.sh
-/var/backups/ups-monitor/
+/var/backups/battstat/

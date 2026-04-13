@@ -16,7 +16,7 @@ const { execFileSync } = require('child_process');
 // Run DB migrations on every startup — idempotent, safe, fast
 try {
   execFileSync(process.execPath, [path.join(__dirname, 'scripts', 'migrate.js')], {
-    env: { ...process.env, DB_PATH: process.env.DB_PATH || path.join(__dirname, 'data', 'ups-monitor.db') },
+    env: { ...process.env, DB_PATH: process.env.DB_PATH || path.join(__dirname, 'data', 'battstat.db') },
     stdio: 'inherit',
   });
 } catch (e) {
@@ -91,7 +91,7 @@ const wss = new WebSocketServer({
     const origin = req.headers['origin'];
     if (!isOriginAllowed(origin)) { done(false, 403, 'Forbidden'); return; }
     const cookie = req.headers['cookie'] || '';
-    const match  = cookie.match(/ups_session=([a-f0-9]{64})/);
+    const match  = cookie.match(/battstat_session=([a-f0-9]{64})/);
     const token  = match ? match[1] : null;
     if (!token) { done(false, 401, 'Unauthorized'); return; }
     const session = db.getSession(token);
@@ -110,7 +110,7 @@ wss.on('connection', (ws) => {
 setInterval(() => db.pruneExpiredSessions(), 15 * 60 * 1000);
 
 server.listen(PORT, HOST, () => {
-  console.log(`[server] UPS Monitor running at http://${HOST}:${PORT}`);
+  console.log(`[server] BattStat running at http://${HOST}:${PORT}`);
   startPoller();
 });
 

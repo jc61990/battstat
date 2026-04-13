@@ -19,7 +19,7 @@ function setSessionCookie(res, token, expiresAt, persistent) {
     ...(maxAge ? { maxAge: maxAge * 1000 } : {}),
   };
   if (process.env.NODE_ENV === 'production') opts.secure = true;
-  res.cookie('ups_session', token, opts);
+  res.cookie('battstat_session', token, opts);
 }
 
 const loginLimiter = rateLimit({
@@ -100,7 +100,7 @@ router.post('/logout', (req, res) => {
     if (session) db.auditLog(session.username, req.ip||'', 'LOGOUT', 'auth', '', true);
     db.deleteSession(token);
   }
-  res.clearCookie('ups_session', { path: '/' });
+  res.clearCookie('battstat_session', { path: '/' });
   ok(res, null);
 });
 

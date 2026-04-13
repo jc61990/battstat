@@ -4,7 +4,7 @@ const db = require('../db');
 
 function getTokenFromRequest(req) {
   const cookie = req.headers.cookie || '';
-  const match  = cookie.match(/ups_session=([a-f0-9]{64})/);
+  const match  = cookie.match(/battstat_session=([a-f0-9]{64})/);
   return match ? match[1] : null;
 }
 

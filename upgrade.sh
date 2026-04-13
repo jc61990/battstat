@@ -21,7 +21,7 @@ usage() {
   echo ""
   echo "Examples:"
   echo "  sudo bash upgrade.sh                         # git pull upgrade"
-  echo "  sudo bash upgrade.sh --from /tmp/ups-monitor # upgrade from zip"
+  echo "  sudo bash upgrade.sh --from /tmp/battstat # upgrade from zip"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -35,7 +35,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ── Pre-flight checks ─────────────────────────────────────────────────────────
-header "UPS Monitor — Upgrade"
+header "BattStat — Upgrade"
 
 require_root
 
@@ -63,7 +63,7 @@ else
   error "Cannot upgrade: ${APP_DIR} is not a git repository and --from was not specified."
   echo ""
   echo "To upgrade from a zip/directory:"
-  echo "  sudo bash upgrade.sh --from /path/to/extracted/ups-monitor"
+  echo "  sudo bash upgrade.sh --from /path/to/extracted/battstat"
   exit 1
 fi
 
@@ -101,11 +101,11 @@ rollback() {
   echo ""
   error "Upgrade failed. Attempting rollback..."
 
-  if [ -n "$BACKUP_PATH" ] && [ -f "${BACKUP_PATH}/ups-monitor.db" ]; then
+  if [ -n "$BACKUP_PATH" ] && [ -f "${BACKUP_PATH}/battstat.db" ]; then
     warn "Restoring database from backup..."
-    cp "${BACKUP_PATH}/ups-monitor.db" "${DATA_DIR}/ups-monitor.db"
-    chown "${SERVICE_USER}:${SERVICE_USER}" "${DATA_DIR}/ups-monitor.db"
-    chmod 660 "${DATA_DIR}/ups-monitor.db"
+    cp "${BACKUP_PATH}/battstat.db" "${DATA_DIR}/battstat.db"
+    chown "${SERVICE_USER}:${SERVICE_USER}" "${DATA_DIR}/battstat.db"
+    chmod 660 "${DATA_DIR}/battstat.db"
     success "Database restored from ${BACKUP_PATH}"
   else
     warn "No backup available to restore database from."
@@ -183,7 +183,7 @@ install_service  # Re-install in case the unit file changed
 
 # Run database migrations
 header "5/5: Database migrations"
-if DB_PATH="${DATA_DIR}/ups-monitor.db" node "${APP_DIR}/scripts/migrate.js"; then
+if DB_PATH="${DATA_DIR}/battstat.db" node "${APP_DIR}/scripts/migrate.js"; then
   success "Migrations complete"
 else
   error "Migration failed. Database unchanged — safe to rollback."
@@ -203,6 +203,6 @@ if start_service; then
 else
   error "Service failed to start after upgrade."
   error "Database is intact. Check logs: journalctl -u ${SERVICE_NAME} -n 50"
-  error "To restore manually: cp ${BACKUP_PATH}/ups-monitor.db ${DATA_DIR}/"
+  error "To restore manually: cp ${BACKUP_PATH}/battstat.db ${DATA_DIR}/"
   exit 1
 fi

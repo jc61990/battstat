@@ -4,7 +4,7 @@
 const readline = require('readline');
 const path = require('path');
 
-process.env.DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'ups-monitor.db');
+process.env.DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'battstat.db');
 
 const db = require('../db');
 
@@ -12,7 +12,7 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 const ask = (q) => new Promise(r => rl.question(q, r));
 
 async function main() {
-  console.log('\n=== UPS Monitor — Create Admin User ===\n');
+  console.log('\n=== BattStat — Create Admin User ===\n');
 
   const existingUsers = db.getUsers();
   if (existingUsers.length > 0) {

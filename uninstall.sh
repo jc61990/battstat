@@ -14,7 +14,7 @@ usage() {
   echo ""
   echo "Options:"
   echo "  --purge         Remove database and all data (default: preserve data)"
-  echo "  --keep-user     Do not remove the 'ups-monitor' system user"
+  echo "  --keep-user     Do not remove the 'battstat' system user"
   echo "  --force         Skip confirmation prompt"
   echo "  -h, --help      Show this help"
   echo ""
@@ -33,12 +33,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ── Pre-flight ────────────────────────────────────────────────────────────────
-header "UPS Monitor — Uninstall"
+header "BattStat — Uninstall"
 
 require_root
 
 if [ ! -d "$APP_DIR" ] && ! systemctl list-unit-files "${SERVICE_NAME}.service" &>/dev/null 2>&1; then
-  warn "UPS Monitor does not appear to be installed. Nothing to do."
+  warn "BattStat does not appear to be installed. Nothing to do."
   exit 0
 fi
 
@@ -98,7 +98,7 @@ else
     success "Data preserved at: ${local_dest}"
     echo ""
     info "To restore later, reinstall and copy the database back:"
-    echo "  cp ${local_dest}/ups-monitor.db ${DATA_DIR}/"
+    echo "  cp ${local_dest}/battstat.db ${DATA_DIR}/"
   else
     info "No data directory found — nothing to preserve."
   fi
@@ -143,4 +143,4 @@ if [ "$PURGE_DATA" -ne 1 ] && [ -d "${BACKUP_DIR}/final_uninstall" ]; then
   echo "    sudo rm -rf ${BACKUP_DIR}"
 fi
 echo ""
-success "UPS Monitor has been uninstalled."
+success "BattStat has been uninstalled."

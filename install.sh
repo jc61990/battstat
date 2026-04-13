@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/scripts/common.sh"
 
-header "UPS Monitor — Installer"
+header "BattStat — Installer"
 
 require_root
 detect_distro
@@ -47,7 +47,7 @@ if start_service; then
   print_useful_commands
 
   # Only run first-user setup if the database has no users yet
-  USER_COUNT=$(DB_PATH="${DATA_DIR}/ups-monitor.db" node -e \
+  USER_COUNT=$(DB_PATH="${DATA_DIR}/battstat.db" node -e \
     "try{const d=require('${APP_DIR}/db');process.stdout.write(String(d.getUsers().length))}catch(e){process.stdout.write('0')}" \
     2>/dev/null || echo "0")
 
@@ -55,7 +55,7 @@ if start_service; then
     echo ""
     info "No users found. Creating the initial admin account..."
     echo ""
-    DB_PATH="${DATA_DIR}/ups-monitor.db" node "${APP_DIR}/scripts/create-admin.js"
+    DB_PATH="${DATA_DIR}/battstat.db" node "${APP_DIR}/scripts/create-admin.js"
   else
     echo ""
     info "${USER_COUNT} existing user(s) found — skipping admin creation."

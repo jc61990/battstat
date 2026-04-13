@@ -1,0 +1,48 @@
+[Unit]
+Description=UPS Battery Health Monitor
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=battstat
+Group=battstat
+WorkingDirectory=/opt/battstat
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=battstat
+
+Environment=NODE_ENV=production
+Environment=PORT=3000
+# Bind to localhost only — use a reverse proxy (nginx/caddy) for external access
+# Change to 0.0.0.0 only if you have a firewall restricting access
+Environment=HOST=127.0.0.1
+# REQUIRED: Set a strong password to protect the dashboard
+# Generate one with: openssl rand -base64 24
+# Set this to your dashboard URL if accessing via reverse proxy, e.g. https://ups.internal.company.com
+# Environment=ALLOWED_ORIGIN=http://your-server-ip:3000
+Environment=DB_PATH=/opt/battstat/data/battstat.db
+
+# Hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/battstat/data
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+[Install]
+WantedBy=multi-user.target

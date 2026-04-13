@@ -2,12 +2,12 @@
 # Shared functions used by install.sh, upgrade.sh, and uninstall.sh
 # Source this file — do not run directly.
 
-APP_DIR="/opt/ups-monitor"
-SERVICE_NAME="ups-monitor"
-SERVICE_USER="ups-monitor"
+APP_DIR="/opt/battstat"
+SERVICE_NAME="battstat"
+SERVICE_USER="battstat"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 DATA_DIR="${APP_DIR}/data"
-BACKUP_DIR="/var/backups/ups-monitor"
+BACKUP_DIR="/var/backups/battstat"
 
 # ── Colour helpers ────────────────────────────────────────────────────────────
 RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'
@@ -123,9 +123,9 @@ fix_permissions() {
   # Data directory: owner rwx, group rwx (so root scripts can write too)
   chmod 770 "$DATA_DIR"
   # Protect the database file itself if it exists
-  if [ -f "${DATA_DIR}/ups-monitor.db" ]; then
-    chmod 660 "${DATA_DIR}/ups-monitor.db"
-    chown "${SERVICE_USER}:${SERVICE_USER}" "${DATA_DIR}/ups-monitor.db"
+  if [ -f "${DATA_DIR}/battstat.db" ]; then
+    chmod 660 "${DATA_DIR}/battstat.db"
+    chown "${SERVICE_USER}:${SERVICE_USER}" "${DATA_DIR}/battstat.db"
   fi
   # node_modules should not be world-readable
   if [ -d "${APP_DIR}/node_modules" ]; then
@@ -136,7 +136,7 @@ fix_permissions() {
 # ── Systemd ───────────────────────────────────────────────────────────────────
 install_service() {
   info "Installing systemd service..."
-  cp "${APP_DIR}/ups-monitor.service" "$SERVICE_FILE"
+  cp "${APP_DIR}/battstat.service" "$SERVICE_FILE"
   systemctl daemon-reload
   systemctl enable "$SERVICE_NAME"
   success "Service installed and enabled"
@@ -180,18 +180,18 @@ backup_data() {
   mkdir -p "$BACKUP_DIR"
   chmod 700 "$BACKUP_DIR"
 
-  if [ -f "${DATA_DIR}/ups-monitor.db" ]; then
+  if [ -f "${DATA_DIR}/battstat.db" ]; then
     info "Backing up database to ${dest}/..."
     mkdir -p "$dest"
-    cp "${DATA_DIR}/ups-monitor.db" "${dest}/ups-monitor.db"
+    cp "${DATA_DIR}/battstat.db" "${dest}/battstat.db"
     # Also save current version info
     echo "version=$(get_git_version)" > "${dest}/backup.info"
     echo "timestamp=${ts}" >> "${dest}/backup.info"
     echo "label=${label}" >> "${dest}/backup.info"
-    success "Database backed up to ${dest}/ups-monitor.db"
+    success "Database backed up to ${dest}/battstat.db"
     echo "$dest"
   else
-    warn "No database found at ${DATA_DIR}/ups-monitor.db — skipping backup"
+    warn "No database found at ${DATA_DIR}/battstat.db — skipping backup"
     echo ""
   fi
 }

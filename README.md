@@ -1,4 +1,4 @@
-# UPS Monitor
+# BattStat
 
 Self-hosted UPS battery health dashboard with SNMPv3 polling, live WebSocket updates, multi-site management, local user accounts, and LDAP / Active Directory authentication — no domain join required.
 
@@ -18,18 +18,18 @@ Self-hosted UPS battery health dashboard with SNMPv3 polling, live WebSocket upd
 
 ```bash
 # From a zip download
-unzip ups-monitor.zip -d /tmp
-sudo bash /tmp/ups-monitor/install.sh
+unzip battstat.zip -d /tmp
+sudo bash /tmp/battstat/install.sh
 
 # From a git clone (recommended — enables git-based upgrades)
-git clone https://github.com/yourorg/ups-monitor.git /tmp/ups-monitor
-sudo bash /tmp/ups-monitor/install.sh
+git clone https://github.com/yourorg/battstat.git /tmp/battstat
+sudo bash /tmp/battstat/install.sh
 ```
 
 The installer:
 1. Detects your distro and installs Node.js 20 LTS if missing
-2. Creates a locked `ups-monitor` system user
-3. Copies files to `/opt/ups-monitor` (preserving `.git` metadata for future upgrades)
+2. Creates a locked `battstat` system user
+3. Copies files to `/opt/battstat` (preserving `.git` metadata for future upgrades)
 4. Runs `npm install --omit=dev`
 5. Installs and starts the systemd service
 6. Runs the interactive admin account creation
@@ -42,10 +42,10 @@ Dashboard will be at `http://<server-ip>:3000` after opening the port in your fi
 
 ```bash
 # Copy or clone to the server
-git clone https://github.com/yourorg/ups-monitor.git /opt/ups-monitor
-# or: scp -r ups-monitor/ user@server:/opt/ups-monitor
+git clone https://github.com/yourorg/battstat.git /opt/battstat
+# or: scp -r battstat/ user@server:/opt/battstat
 
-cd /opt/ups-monitor
+cd /opt/battstat
 npm install --omit=dev
 
 # Create the first admin user
@@ -55,9 +55,9 @@ node scripts/create-admin.js
 node server.js
 
 # Install as a systemd service
-sudo cp ups-monitor.service /etc/systemd/system/
+sudo cp battstat.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now ups-monitor
+sudo systemctl enable --now battstat
 ```
 
 ---
@@ -191,7 +191,7 @@ Vendor detection is automatic via `sysDescr`. If your device isn't detected corr
 |---|---|---|
 | `PORT` | `3000` | HTTP listen port |
 | `HOST` | `127.0.0.1` | Bind address. Change to `0.0.0.0` only if behind a firewall or reverse proxy |
-| `DB_PATH` | `./data/ups-monitor.db` | SQLite database path |
+| `DB_PATH` | `./data/battstat.db` | SQLite database path |
 | `ALLOWED_ORIGIN` | _(empty)_ | If set, WebSocket connections are only accepted from this exact origin (e.g. `https://ups.internal.company.com`) |
 
 ---
@@ -200,33 +200,33 @@ Vendor detection is automatic via `sysDescr`. If your device isn't detected corr
 
 ```bash
 # View live logs
-journalctl -u ups-monitor -f
+journalctl -u battstat -f
 
 # Restart service
-systemctl restart ups-monitor
+systemctl restart battstat
 
 # Check service status
-systemctl status ups-monitor
+systemctl status battstat
 
 # Add an admin user
-cd /opt/ups-monitor && node scripts/create-admin.js
+cd /opt/battstat && node scripts/create-admin.js
 
 # Run database migrations manually
-cd /opt/ups-monitor && node scripts/migrate.js
+cd /opt/battstat && node scripts/migrate.js
 
 # Backup the database
-cp /opt/ups-monitor/data/ups-monitor.db /backup/ups-monitor-$(date +%Y%m%d).db
+cp /opt/battstat/data/battstat.db /backup/battstat-$(date +%Y%m%d).db
 ```
 
 ## Upgrading
 
 ### From a git clone (recommended)
 ```bash
-sudo bash /opt/ups-monitor/upgrade.sh
+sudo bash /opt/battstat/upgrade.sh
 ```
 
 The upgrade script:
-1. Backs up the database to `/var/backups/ups-monitor/`
+1. Backs up the database to `/var/backups/battstat/`
 2. Stops the service
 3. Runs `git pull --ff-only`
 4. Runs `npm install`
@@ -236,8 +236,8 @@ The upgrade script:
 
 ### From a zip download
 ```bash
-unzip ups-monitor-new.zip -d /tmp
-sudo bash /opt/ups-monitor/upgrade.sh --from /tmp/ups-monitor
+unzip battstat-new.zip -d /tmp
+sudo bash /opt/battstat/upgrade.sh --from /tmp/battstat
 ```
 
 ### Options
@@ -250,14 +250,14 @@ sudo bash upgrade.sh --help          # full usage
 ## Uninstalling
 
 ```bash
-# Preserve the database (default — data saved to /var/backups/ups-monitor/)
-sudo bash /opt/ups-monitor/uninstall.sh
+# Preserve the database (default — data saved to /var/backups/battstat/)
+sudo bash /opt/battstat/uninstall.sh
 
 # Remove everything including the database (permanent)
-sudo bash /opt/ups-monitor/uninstall.sh --purge
+sudo bash /opt/battstat/uninstall.sh --purge
 
 # Full options
-sudo bash /opt/ups-monitor/uninstall.sh --help
+sudo bash /opt/battstat/uninstall.sh --help
 ```
 
 ---
@@ -267,10 +267,10 @@ sudo bash /opt/ups-monitor/uninstall.sh --help
 ### ufw (Ubuntu/Debian)
 ```bash
 # Allow only from your internal network (recommended)
-sudo ufw allow from 10.0.0.0/8 to any port 3000 comment "UPS Monitor"
+sudo ufw allow from 10.0.0.0/8 to any port 3000 comment "BattStat"
 
 # Or allow from everywhere (if the server itself is firewalled)
-sudo ufw allow 3000/tcp comment "UPS Monitor"
+sudo ufw allow 3000/tcp comment "BattStat"
 ```
 
 ### firewalld (Fedora/RHEL)
@@ -295,8 +295,8 @@ server {
     listen 443 ssl;
     server_name ups.internal.company.com;
 
-    ssl_certificate     /etc/ssl/certs/ups-monitor.crt;
-    ssl_certificate_key /etc/ssl/private/ups-monitor.key;
+    ssl_certificate     /etc/ssl/certs/battstat.crt;
+    ssl_certificate_key /etc/ssl/private/battstat.key;
 
     location / {
         proxy_pass http://127.0.0.1:3000;
@@ -322,5 +322,5 @@ Then set `ALLOWED_ORIGIN=https://ups.internal.company.com` in the systemd unit f
 - All admin actions (user creation, SNMP config changes, login attempts) are written to the audit log
 - The WebSocket endpoint validates session cookies and rejects connections from unexpected origins
 - Rate limiting: 120 API requests/min globally, 20 manual polls/min, 20 login attempts per 15 minutes
-- The `ups-monitor` system user runs with `NoNewPrivileges`, `ProtectSystem=strict`, `MemoryDenyWriteExecute`, and other systemd hardening
+- The `battstat` system user runs with `NoNewPrivileges`, `ProtectSystem=strict`, `MemoryDenyWriteExecute`, and other systemd hardening
 - SNMP credentials and LDAP bind passwords are stored in SQLite — protect the database file (`chmod 600`)

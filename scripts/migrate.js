@@ -12,7 +12,7 @@
 
 const path = require('path');
 process.env.DB_PATH = process.env.DB_PATH ||
-  path.join(__dirname, '..', 'data', 'ups-monitor.db');
+  path.join(__dirname, '..', 'data', 'battstat.db');
 
 const Database = require('better-sqlite3');
 const fs = require('fs');
