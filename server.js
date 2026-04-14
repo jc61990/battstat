@@ -70,12 +70,14 @@ app.get('/login', (req, res) => {
 });
 
 // All other routes — require a valid session
-app.get('/{*splat}', (req, res) => {
+function serveApp(req, res) {
   const token   = getTokenFromRequest(req);
   const session = token ? db.getSession(token) : null;
   if (!session) return res.redirect('/login');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+}
+app.get('/', serveApp);
+app.get('/{*splat}', serveApp);
 
 app.use((err, req, res, _next) => {
   console.error('[error]', err.message);
