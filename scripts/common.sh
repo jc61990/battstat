@@ -1,5 +1,5 @@
 #!/bin/bash
-# Shared functions used by install.sh, upgrade.sh, and uninstall.sh
+# Shared functions used by install.sh, upgrade.sh, and uninstall.sh.
 # Source this file — do not run directly.
 
 APP_DIR="/opt/battstat"
@@ -28,7 +28,10 @@ require_root() {
 }
 
 # ── Detect distro / package manager ──────────────────────────────────────────
+# Sets DISTRO (debian|fedora|rhel) and PKG_MGR (apt-get|dnf|yum).
+# Safe to call multiple times — detection result is cached.
 detect_distro() {
+  if [ -n "${DISTRO:-}" ]; then return; fi  # already detected
   if command -v apt-get &>/dev/null; then
     DISTRO="debian"
     PKG_MGR="apt-get"
@@ -42,7 +45,42 @@ detect_distro() {
     error "Unsupported distribution. Supported: Debian/Ubuntu, Fedora, RHEL/Rocky/AlmaLinux."
     exit 1
   fi
-  info "Detected distro family: ${DISTRO} (${PKG_MGR})"
+  info "Detected: ${DISTRO} (${PKG_MGR})"
+}
+
+# ── Build tools ───────────────────────────────────────────────────────────────
+# better-sqlite3 and ldapjs compile native C++ addons during npm install.
+# On a minimal server image the compiler toolchain is often absent.
+ensure_build_tools() {
+  detect_distro
+  info "Checking build tools (required for native npm modules)..."
+
+  local missing=()
+
+  command -v gcc   &>/dev/null || missing+=("gcc")
+  command -v g++   &>/dev/null || missing+=("g++ / gcc-c++")
+  command -v make  &>/dev/null || missing+=("make")
+  command -v python3 &>/dev/null || missing+=("python3")
+
+  if [ "${#missing[@]}" -eq 0 ]; then
+    success "Build tools present"
+    return
+  fi
+
+  warn "Missing build tools: ${missing[*]}"
+  info "Installing compiler toolchain..."
+
+  case "$DISTRO" in
+    debian)
+      apt-get install -y build-essential python3
+      ;;
+    fedora|rhel)
+      # gcc-c++ pulls in gcc; python3 is the package name on both
+      "${PKG_MGR}" install -y gcc gcc-c++ make python3
+      ;;
+  esac
+
+  success "Build tools installed"
 }
 
 # ── Node.js install / check ───────────────────────────────────────────────────
@@ -51,16 +89,16 @@ ensure_node() {
     local ver
     ver=$(node -e "process.stdout.write(process.version.split('.')[0].slice(1))")
     if [ "$ver" -lt 18 ]; then
-      warn "Node.js ${ver} found but 18+ is required. Attempting upgrade..."
+      warn "Node.js v${ver} found but 18+ is required — upgrading..."
       install_node
     else
       success "Node.js $(node --version) already installed"
     fi
   else
-    info "Node.js not found. Installing Node.js 20 LTS..."
+    info "Node.js not found — installing Node.js 20 LTS..."
     install_node
   fi
-  info "npm: $(npm --version)"
+  success "npm $(npm --version)"
 }
 
 install_node() {
@@ -72,7 +110,7 @@ install_node() {
       ;;
     fedora|rhel)
       curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
-      ${PKG_MGR} install -y nodejs
+      "${PKG_MGR}" install -y nodejs
       ;;
   esac
   success "Node.js $(node --version) installed"
@@ -96,7 +134,9 @@ is_git_repo() {
 
 get_git_version() {
   if is_git_repo "$APP_DIR"; then
-    git -C "$APP_DIR" describe --tags --always 2>/dev/null || git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown"
+    git -C "$APP_DIR" describe --tags --always 2>/dev/null \
+      || git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null \
+      || echo "unknown"
   else
     echo "unknown"
   fi
@@ -110,24 +150,29 @@ get_git_remote() {
 npm_install() {
   info "Installing Node.js dependencies..."
   cd "$APP_DIR"
-  # Run as root then fix ownership — avoids running npm as the service user
-  npm install --omit=dev --prefer-offline 2>&1 | grep -v "^npm warn" || true
+
+  # Show output but suppress the noisy funding/audit lines
+  if ! npm install --omit=dev 2>&1 \
+      | grep -v "^npm warn" \
+      | grep -v "^npm notice" \
+      | grep -v "funding" \
+      | grep -v "looking for funding"; then
+    error "npm install failed — check output above"
+    exit 1
+  fi
+
   success "Dependencies installed"
 }
 
 # ── Permissions ───────────────────────────────────────────────────────────────
 fix_permissions() {
   chown -R "${SERVICE_USER}:${SERVICE_USER}" "$APP_DIR"
-  # App directory: owner rwx, group r-x, other ---
   chmod 750 "$APP_DIR"
-  # Data directory: owner rwx, group rwx (so root scripts can write too)
   chmod 770 "$DATA_DIR"
-  # Protect the database file itself if it exists
   if [ -f "${DATA_DIR}/battstat.db" ]; then
     chmod 660 "${DATA_DIR}/battstat.db"
     chown "${SERVICE_USER}:${SERVICE_USER}" "${DATA_DIR}/battstat.db"
   fi
-  # node_modules should not be world-readable
   if [ -d "${APP_DIR}/node_modules" ]; then
     chmod 750 "${APP_DIR}/node_modules"
   fi
@@ -145,7 +190,7 @@ install_service() {
 start_service() {
   info "Starting service..."
   systemctl restart "$SERVICE_NAME"
-  sleep 2
+  sleep 3
   if systemctl is-active --quiet "$SERVICE_NAME"; then
     success "Service is running"
     return 0
@@ -173,21 +218,19 @@ disable_service() {
 # ── Backup ────────────────────────────────────────────────────────────────────
 backup_data() {
   local label="${1:-manual}"
-  local ts
+  local ts dest
   ts=$(date +%Y%m%d_%H%M%S)
-  local dest="${BACKUP_DIR}/${ts}_${label}"
+  dest="${BACKUP_DIR}/${ts}_${label}"
 
   mkdir -p "$BACKUP_DIR"
   chmod 700 "$BACKUP_DIR"
 
   if [ -f "${DATA_DIR}/battstat.db" ]; then
-    info "Backing up database to ${dest}/..."
+    info "Backing up database to ${dest}..."
     mkdir -p "$dest"
     cp "${DATA_DIR}/battstat.db" "${dest}/battstat.db"
-    # Also save current version info
-    echo "version=$(get_git_version)" > "${dest}/backup.info"
-    echo "timestamp=${ts}" >> "${dest}/backup.info"
-    echo "label=${label}" >> "${dest}/backup.info"
+    printf "version=%s\ntimestamp=%s\nlabel=%s\n" \
+      "$(get_git_version)" "$ts" "$label" > "${dest}/backup.info"
     success "Database backed up to ${dest}/battstat.db"
     echo "$dest"
   else
@@ -203,9 +246,9 @@ list_backups() {
     for d in "${BACKUP_DIR}"/*/; do
       if [ -f "${d}backup.info" ]; then
         local ts ver label
-        ts=$(grep "^timestamp=" "${d}backup.info" | cut -d= -f2)
-        ver=$(grep "^version=" "${d}backup.info" | cut -d= -f2)
-        label=$(grep "^label=" "${d}backup.info" | cut -d= -f2)
+        ts=$(grep    "^timestamp=" "${d}backup.info" | cut -d= -f2)
+        ver=$(grep   "^version="   "${d}backup.info" | cut -d= -f2)
+        label=$(grep "^label="     "${d}backup.info" | cut -d= -f2)
         printf "  %-30s  ver: %-12s  %s\n" "$(basename "$d")" "$ver" "$label"
       fi
     done
@@ -222,10 +265,10 @@ print_dashboard_url() {
 }
 
 print_useful_commands() {
-  echo "  journalctl -u ${SERVICE_NAME} -f          # live logs"
-  echo "  systemctl status ${SERVICE_NAME}           # service status"
-  echo "  systemctl restart ${SERVICE_NAME}          # restart"
-  echo "  node ${APP_DIR}/scripts/create-admin.js   # add admin user"
-  echo "  bash ${APP_DIR}/upgrade.sh                 # upgrade to latest"
-  echo "  bash ${APP_DIR}/uninstall.sh               # uninstall"
+  echo "  journalctl -u ${SERVICE_NAME} -f           # live logs"
+  echo "  systemctl status ${SERVICE_NAME}            # service status"
+  echo "  systemctl restart ${SERVICE_NAME}           # restart"
+  echo "  node ${APP_DIR}/scripts/create-admin.js    # add admin user"
+  echo "  sudo bash ${APP_DIR}/upgrade.sh             # upgrade to latest"
+  echo "  sudo bash ${APP_DIR}/uninstall.sh           # uninstall"
 }

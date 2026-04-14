@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/common.sh
 source "${SCRIPT_DIR}/scripts/common.sh"
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
@@ -13,65 +14,60 @@ usage() {
   echo "Usage: sudo bash uninstall.sh [OPTIONS]"
   echo ""
   echo "Options:"
-  echo "  --purge         Remove database and all data (default: preserve data)"
-  echo "  --keep-user     Do not remove the 'battstat' system user"
-  echo "  --force         Skip confirmation prompt"
-  echo "  -h, --help      Show this help"
+  echo "  --purge        Permanently delete the database and all data"
+  echo "  --keep-user    Do not remove the 'battstat' system user"
+  echo "  --force        Skip confirmation prompt"
+  echo "  -h, --help     Show this help"
   echo ""
-  echo "By default, the database is preserved at ${BACKUP_DIR}/final_uninstall/"
-  echo "Use --purge to delete it permanently."
+  echo "By default the database is saved to ${BACKUP_DIR}/final_uninstall/"
+  echo "before deletion. Use --purge to skip the backup and delete permanently."
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --purge)      PURGE_DATA=1; shift ;;
-    --keep-user)  KEEP_USER=1; shift ;;
-    --force)      FORCE=1; shift ;;
-    -h|--help)    usage; exit 0 ;;
+    --purge)     PURGE_DATA=1; shift ;;
+    --keep-user) KEEP_USER=1; shift ;;
+    --force)     FORCE=1; shift ;;
+    -h|--help)   usage; exit 0 ;;
     *) error "Unknown option: $1"; usage; exit 1 ;;
   esac
 done
 
 # ── Pre-flight ────────────────────────────────────────────────────────────────
 header "BattStat — Uninstall"
-
 require_root
 
-if [ ! -d "$APP_DIR" ] && ! systemctl list-unit-files "${SERVICE_NAME}.service" &>/dev/null 2>&1; then
+APP_INSTALLED=0
+SERVICE_INSTALLED=0
+[ -d "$APP_DIR" ] && APP_INSTALLED=1
+systemctl list-unit-files "${SERVICE_NAME}.service" &>/dev/null 2>&1 && SERVICE_INSTALLED=1
+
+if [ "$APP_INSTALLED" -eq 0 ] && [ "$SERVICE_INSTALLED" -eq 0 ]; then
   warn "BattStat does not appear to be installed. Nothing to do."
   exit 0
 fi
 
 # ── Show what will happen ─────────────────────────────────────────────────────
 echo ""
-echo "This will remove:"
-echo "  - Systemd service: ${SERVICE_FILE}"
-echo "  - Application files: ${APP_DIR}"
+echo "The following will be removed:"
+[ "$SERVICE_INSTALLED" -eq 1 ] && echo "  Systemd service:   ${SERVICE_FILE}"
+[ "$APP_INSTALLED" -eq 1 ]     && echo "  Application files: ${APP_DIR}"
 if [ "$PURGE_DATA" -eq 1 ]; then
-  echo -e "  ${RED}- Database and all data: ${DATA_DIR} (PERMANENT)${RESET}"
+  echo -e "  ${RED}Database (PERMANENT DELETE): ${DATA_DIR}${RESET}"
 else
-  echo "  - Database will be backed up to: ${BACKUP_DIR}/final_uninstall/"
-  echo "    (use --purge to delete it permanently)"
+  echo "  Database will be saved to: ${BACKUP_DIR}/final_uninstall/"
 fi
-if [ "$KEEP_USER" -eq 0 ]; then
-  echo "  - System user: ${SERVICE_USER}"
-fi
+[ "$KEEP_USER" -eq 0 ] && echo "  System user: ${SERVICE_USER}"
 echo ""
 
 if [ "$FORCE" -ne 1 ]; then
   if [ "$PURGE_DATA" -eq 1 ]; then
-    echo -e "${RED}${BOLD}WARNING: --purge will permanently delete the database. This cannot be undone.${RESET}"
-    read -r -p "Type 'yes' to confirm permanent data deletion: " CONFIRM
-    if [ "$CONFIRM" != "yes" ]; then
-      info "Uninstall cancelled."
-      exit 0
-    fi
+    echo -e "${RED}${BOLD}WARNING: --purge will permanently delete all data. This cannot be undone.${RESET}"
+    read -r -p "Type 'yes' to confirm: " CONFIRM
+    [ "$CONFIRM" = "yes" ] || { info "Uninstall cancelled."; exit 0; }
   else
     read -r -p "Confirm uninstall? [y/N] " CONFIRM
-    if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
-      info "Uninstall cancelled."
-      exit 0
-    fi
+    [[ "$CONFIRM" =~ ^[Yy]$ ]] || { info "Uninstall cancelled."; exit 0; }
   fi
 fi
 
@@ -80,7 +76,7 @@ header "Stopping service"
 stop_service
 disable_service
 
-# ── Back up or purge data ─────────────────────────────────────────────────────
+# ── Handle data ───────────────────────────────────────────────────────────────
 header "Data"
 if [ "$PURGE_DATA" -eq 1 ]; then
   if [ -d "$DATA_DIR" ]; then
@@ -89,18 +85,17 @@ if [ "$PURGE_DATA" -eq 1 ]; then
     success "Data directory deleted"
   fi
 else
-  # Move data to backup location before deleting app dir
   if [ -d "$DATA_DIR" ] && [ "$(ls -A "$DATA_DIR" 2>/dev/null)" ]; then
-    local_dest="${BACKUP_DIR}/final_uninstall"
-    mkdir -p "$local_dest"
-    cp -r "${DATA_DIR}/." "$local_dest/"
-    chmod 700 "$local_dest"
-    success "Data preserved at: ${local_dest}"
+    SAVE_DEST="${BACKUP_DIR}/final_uninstall"
+    mkdir -p "$SAVE_DEST"
+    chmod 700 "$SAVE_DEST"
+    cp -r "${DATA_DIR}/." "$SAVE_DEST/"
+    success "Data preserved at: ${SAVE_DEST}"
     echo ""
-    info "To restore later, reinstall and copy the database back:"
-    echo "  cp ${local_dest}/battstat.db ${DATA_DIR}/"
+    info "To restore after reinstalling:"
+    echo "  sudo cp ${SAVE_DEST}/battstat.db ${DATA_DIR}/"
   else
-    info "No data directory found — nothing to preserve."
+    info "No data directory found — nothing to preserve"
   fi
 fi
 
@@ -130,7 +125,7 @@ if [ "$KEEP_USER" -eq 0 ]; then
     userdel "$SERVICE_USER"
     success "Removed system user '${SERVICE_USER}'"
   else
-    info "System user '${SERVICE_USER}' not found — already removed"
+    info "System user '${SERVICE_USER}' not found"
   fi
 fi
 
@@ -139,7 +134,7 @@ header "Uninstall complete"
 if [ "$PURGE_DATA" -ne 1 ] && [ -d "${BACKUP_DIR}/final_uninstall" ]; then
   success "Data preserved at ${BACKUP_DIR}/final_uninstall/"
   echo ""
-  echo "  To completely remove all remaining files:"
+  echo "  To remove all remaining files:"
   echo "    sudo rm -rf ${BACKUP_DIR}"
 fi
 echo ""
