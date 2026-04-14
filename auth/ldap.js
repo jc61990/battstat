@@ -104,7 +104,7 @@ async function authenticateLdap(username, password) {
     return { success: false, error: 'User not found in directory' };
   }
   if (entries.length > 1) {
-    return { success: false, error: 'Ambiguous user — multiple directory entries matched' };
+    return { success: false, error: 'Ambiguous user -- multiple directory entries matched' };
   }
 
   const entry = entries[0];
@@ -129,7 +129,7 @@ async function authenticateLdap(username, password) {
       return { success: false, error: 'Account is locked in Active Directory' };
     }
     if (msg.includes('password expired') || msg.includes('532')) {
-      return { success: false, error: 'Password has expired — change it in Active Directory' };
+      return { success: false, error: 'Password has expired -- change it in Active Directory' };
     }
     return { success: false, error: 'Authentication failed: ' + msg };
   }
@@ -151,13 +151,13 @@ async function authenticateLdap(username, password) {
   if (!roleId) {
     return {
       success: false,
-      error:   'No role assigned — your AD groups are not mapped to any role. Contact your administrator.',
+      error:   'No role assigned -- your AD groups are not mapped to any role. Contact your administrator.',
     };
   }
 
   const role = db.getRole(roleId);
   if (!role) {
-    return { success: false, error: 'Mapped role no longer exists — contact administrator' };
+    return { success: false, error: 'Mapped role no longer exists -- contact administrator' };
   }
 
   return {

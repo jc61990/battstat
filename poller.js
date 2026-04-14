@@ -47,7 +47,7 @@ const OID = {
   cyberModel:         '1.3.6.1.4.1.3808.1.1.1.1.1.1.0',
   cyberSerial:        '1.3.6.1.4.1.3808.1.1.1.1.2.3.0',
 
-  // Tripp Lite — LX Platform / WEBCARDLX (newer, firmware 15.x+)
+  // Tripp Lite -- LX Platform / WEBCARDLX (newer, firmware 15.x+)
   // Enterprise OID prefix: 1.3.6.1.4.1.850
   tlBattCapacity:     '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.4.1',  // percent
   tlBattStatus:       '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.3.1',  // 1=unknown,2=normal,3=low,4=depleted
@@ -61,7 +61,7 @@ const OID = {
   tlFirmware:         '1.3.6.1.4.1.850.1.1.1.2.1.5.1',
   tlNextReplaceDate:  '1.3.6.1.4.1.850.1.1.3.1.3.1.5.1.6',    // days until replace
 
-  // Tripp Lite — RFC 1628 standard UPS MIB (older SNMPWEBCARD, widely supported)
+  // Tripp Lite -- RFC 1628 standard UPS MIB (older SNMPWEBCARD, widely supported)
   rfc1628BattCapacity:   '1.3.6.1.2.1.33.1.2.4.0',   // percent
   rfc1628BattStatus:     '1.3.6.1.2.1.33.1.2.1.0',   // 1=unknown,2=normal,3=low,4=depleted
   rfc1628BattRunTime:    '1.3.6.1.2.1.33.1.2.3.0',   // seconds (TimeTicks / 100)
@@ -151,7 +151,7 @@ function oidListForVendor(vendor) {
     const tlLoad  = getInt(OID.tlOutputLoad);
     const rfcLoad = getInt(OID.rfc1628OutputLoad);
 
-    // Next replace date from LX Platform is in days-until — convert to a date string
+    // Next replace date from LX Platform is in days-until -- convert to a date string
     const daysUntil = getInt(OID.tlNextReplaceDate);
     let batt_replace_date = null;
     if (daysUntil !== null) {
@@ -187,7 +187,7 @@ function oidListForVendor(vendor) {
       OID.cyberModel, OID.cyberSerial];
   }
   if (vendor === 'tripplite') {
-    // Query both the LX Platform MIB and RFC 1628 — whichever responds wins
+    // Query both the LX Platform MIB and RFC 1628 -- whichever responds wins
     return [OID.sysDescr, OID.sysName,
       OID.tlBattCapacity, OID.tlBattStatus, OID.tlBattRunTime, OID.tlBattTemp,
       OID.tlInputVoltage, OID.tlOutputVoltage, OID.tlOutputLoad,
@@ -243,7 +243,7 @@ function parseVarbinds(varbinds, vendor) {
     const tlLoad  = getInt(OID.tlOutputLoad);
     const rfcLoad = getInt(OID.rfc1628OutputLoad);
 
-    // Next replace date from LX Platform is in days-until — convert to a date string
+    // Next replace date from LX Platform is in days-until -- convert to a date string
     const daysUntil = getInt(OID.tlNextReplaceDate);
     let batt_replace_date = null;
     if (daysUntil !== null) {
@@ -366,7 +366,7 @@ function startPoller() {
   const interval = ((cfg && cfg.poll_interval_s) || 60) * 1000;
   runPollCycle().catch(console.error);
   pollTimer = setInterval(() => runPollCycle().catch(console.error), interval);
-  console.log(`[poller] Started — interval ${interval / 1000}s`);
+  console.log(`[poller] Started -- interval ${interval / 1000}s`);
 }
 
 function stopPoller() {

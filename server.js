@@ -13,7 +13,7 @@ const db         = require('./db');
 const { startPoller, registerWsClient, unregisterWsClient } = require('./poller');
 const { execFileSync } = require('child_process');
 
-// Run DB migrations on every startup — idempotent, safe, fast
+// Run DB migrations on every startup -- idempotent, safe, fast
 try {
   execFileSync(process.execPath, [path.join(__dirname, 'scripts', 'migrate.js')], {
     env: { ...process.env, DB_PATH: process.env.DB_PATH || path.join(__dirname, 'data', 'battstat.db') },
@@ -42,13 +42,13 @@ app.use(helmet({
       imgSrc:          ["'self'", 'data:'],
       frameSrc:        ["'none'"],
       objectSrc:       ["'none'"],
-      // Do NOT include upgrade-insecure-requests — this app runs over plain
+      // Do NOT include upgrade-insecure-requests -- this app runs over plain
       // HTTP on an internal network. That directive causes browsers to silently
       // upgrade fetch/XHR calls to HTTPS, breaking all API requests.
       upgradeInsecureRequests: null,
     },
   },
-  // Disable HSTS — sending this over HTTP causes browsers to block the site.
+  // Disable HSTS -- sending this over HTTP causes browsers to block the site.
   strictTransportSecurity: false,
   crossOriginEmbedderPolicy: false,
 }));
@@ -59,7 +59,7 @@ app.use(express.urlencoded({ extended: false, limit: '16kb' }));
 app.use('/api', rateLimit({ windowMs: 60000, max: 120, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/poll/device', rateLimit({ windowMs: 60000, max: 20, standardHeaders: true, legacyHeaders: false }));
 
-// Serve static assets (css, js, images) but NOT index.html or login.html —
+// Serve static assets (css, js, images) but NOT index.html or login.html --
 // those are gated below so unauthenticated requests get redirected to /login.
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: true,
@@ -70,12 +70,12 @@ app.use(express.static(path.join(__dirname, 'public'), {
 app.use('/api/auth', authRoutes);
 app.use('/api',      routes);
 
-// Login page — always accessible
+// Login page -- always accessible
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// All other routes — require a valid session
+// All other routes -- require a valid session
 function serveApp(req, res) {
   const token   = getTokenFromRequest(req);
   const session = token ? db.getSession(token) : null;
@@ -97,7 +97,7 @@ const wss = new WebSocketServer({
   path: '/ws',
   verifyClient: ({ req }, done) => {
     // Origin check: if ALLOWED_ORIGIN is set, enforce it strictly.
-    // Otherwise skip — the session cookie below is the authentication gate.
+    // Otherwise skip -- the session cookie below is the authentication gate.
     const origin = req.headers['origin'];
     if (ALLOWED_ORIGIN && origin !== ALLOWED_ORIGIN) {
       done(false, 403, 'Forbidden');

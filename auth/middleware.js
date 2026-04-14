@@ -23,7 +23,7 @@ function requirePerm(perm) {
   return [requireAuth, (req, res, next) => {
     if (!req.session[perm]) {
       db.auditLog(req.session.username, req.ip, 'PERMISSION_DENIED', req.path, perm, false);
-      return res.status(403).json({ ok: false, error: `Permission denied — requires ${perm}` });
+      return res.status(403).json({ ok: false, error: `Permission denied -- requires ${perm}` });
     }
     next();
   }];

@@ -12,7 +12,7 @@ function err(res, msg, code=400) { res.status(code).json({ ok: false, error: msg
 
 function setSessionCookie(res, token, expiresAt, persistent) {
   const maxAge = persistent ? (expiresAt - Math.floor(Date.now()/1000)) : undefined;
-  // secure=true is only set when HTTPS=true is explicitly configured —
+  // secure=true is only set when HTTPS=true is explicitly configured --
   // NOT based on NODE_ENV, because production deployments often use plain
   // HTTP on an internal network. Setting secure=true over HTTP causes the
   // browser to silently drop the cookie, breaking login with no error shown.
@@ -32,7 +32,7 @@ const loginLimiter = rateLimit({
   max:      20,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { ok: false, error: 'Too many login attempts — try again in 15 minutes' },
+  message: { ok: false, error: 'Too many login attempts -- try again in 15 minutes' },
 });
 
 router.post('/login', loginLimiter, async (req, res) => {
@@ -209,14 +209,14 @@ router.delete('/users/:id', requirePerm('can_manage_users'), (req, res) => {
 
 router.get('/ldap/config', requirePerm('can_manage_users'), (req, res) => {
   const cfg = db.getLdapConfig();
-  ok(res, { ...cfg, bind_password: cfg.bind_password ? '••••••••' : '' });
+  ok(res, { ...cfg, bind_password: cfg.bind_password ? '********' : '' });
 });
 
 router.post('/ldap/config', requirePerm('can_manage_users'), (req, res) => {
   try {
     const saved = db.saveLdapConfig(req.body);
     db.auditLog(req.session.username, req.ip, 'UPDATE_LDAP_CONFIG', 'ldap', '', true);
-    ok(res, { ...saved, bind_password: saved.bind_password ? '••••••••' : '' });
+    ok(res, { ...saved, bind_password: saved.bind_password ? '********' : '' });
   } catch (e) { err(res, e.message); }
 });
 

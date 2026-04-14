@@ -90,14 +90,14 @@ router.post('/poll/device/:id',    requirePerm('can_poll'), async (req, res) => 
 
 router.get('/snmp/config',  requirePerm('can_manage_snmp'), (req, res) => {
   const cfg = db.getSnmpConfig();
-  ok(res, { ...cfg, auth_key: cfg.auth_key ? '••••••••' : '', priv_key: cfg.priv_key ? '••••••••' : '' });
+  ok(res, { ...cfg, auth_key: cfg.auth_key ? '********' : '', priv_key: cfg.priv_key ? '********' : '' });
 });
 router.post('/snmp/config', requirePerm('can_manage_snmp'), (req, res) => {
   try {
     const saved = db.saveSnmpConfig(req.body);
     restartPoller();
     db.auditLog(req.session.username, req.ip, 'UPDATE_SNMP_CONFIG', 'snmp', '', true);
-    ok(res, { ...saved, auth_key: saved.auth_key ? '••••••••' : '', priv_key: saved.priv_key ? '••••••••' : '' });
+    ok(res, { ...saved, auth_key: saved.auth_key ? '********' : '', priv_key: saved.priv_key ? '********' : '' });
   } catch (e) { err(res, e.message); }
 });
 

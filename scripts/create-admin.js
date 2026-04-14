@@ -12,7 +12,7 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 const ask = (q) => new Promise(r => rl.question(q, r));
 
 async function main() {
-  console.log('\n=== BattStat — Create Admin User ===\n');
+  console.log('\n=== BattStat -- Create Admin User ===\n');
 
   const existingUsers = db.getUsers();
   if (existingUsers.length > 0) {

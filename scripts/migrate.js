@@ -3,7 +3,7 @@
  * Database migration runner.
  * Each migration is identified by a numeric version, runs once,
  * and is recorded in the schema_migrations table.
- * Safe to run multiple times — already-applied migrations are skipped.
+ * Safe to run multiple times -- already-applied migrations are skipped.
  *
  * Called automatically by upgrade.sh after files are updated.
  * Can also be run manually: node scripts/migrate.js
@@ -20,7 +20,7 @@ const fs = require('fs');
 const DB_PATH = process.env.DB_PATH;
 
 if (!fs.existsSync(DB_PATH)) {
-  console.log('[migrate] No database found — nothing to migrate.');
+  console.log('[migrate] No database found -- nothing to migrate.');
   process.exit(0);
 }
 
@@ -43,34 +43,34 @@ function applied(version) {
 
 function apply(version, name, fn) {
   if (applied(version)) {
-    console.log(`[migrate] ${version} — ${name}: already applied, skipping`);
+    console.log(`[migrate] ${version} -- ${name}: already applied, skipping`);
     return;
   }
-  console.log(`[migrate] ${version} — ${name}: applying...`);
+  console.log(`[migrate] ${version} -- ${name}: applying...`);
   try {
     db.transaction(() => {
       fn(db);
       db.prepare('INSERT INTO schema_migrations (version, name) VALUES (?, ?)')
         .run(version, name);
     })();
-    console.log(`[migrate] ${version} — ${name}: done`);
+    console.log(`[migrate] ${version} -- ${name}: done`);
   } catch (err) {
-    console.error(`[migrate] ${version} — ${name}: FAILED — ${err.message}`);
+    console.error(`[migrate] ${version} -- ${name}: FAILED -- ${err.message}`);
     process.exit(1);
   }
 }
 
-// ── Migrations ────────────────────────────────────────────────────────────────
+// -- Migrations ----------------------------------------------------------------
 // Add new migrations at the bottom. Never edit existing ones.
-// Each migration must be idempotent — use IF NOT EXISTS / IF EXISTS guards.
+// Each migration must be idempotent -- use IF NOT EXISTS / IF EXISTS guards.
 
 apply(1, 'initial_schema', (db) => {
-  // Version 1 is the baseline — nothing to run if the tables already exist
+  // Version 1 is the baseline -- nothing to run if the tables already exist
   // (db.js creates them on first run). This just records the baseline.
 });
 
 apply(2, 'add_email_to_local_users', (db) => {
-  // email column was added in v1.2 — add it if somehow missing
+  // email column was added in v1.2 -- add it if somehow missing
   const cols = db.prepare("PRAGMA table_info(local_users)").all();
   if (!cols.find(c => c.name === 'email')) {
     db.exec("ALTER TABLE local_users ADD COLUMN email TEXT NOT NULL DEFAULT ''");
@@ -79,7 +79,7 @@ apply(2, 'add_email_to_local_users', (db) => {
 
 apply(3, 'add_batt_status_text', (db) => {
   // batt_status was INTEGER in early builds, changed to TEXT in v1.1
-  // SQLite doesn't enforce column types so no migration needed —
+  // SQLite doesn't enforce column types so no migration needed --
   // just record that we've checked.
 });
 
@@ -96,7 +96,7 @@ apply(5, 'add_session_user_agent_index', (db) => {
   `);
 });
 
-// ── Summary ───────────────────────────────────────────────────────────────────
+// -- Summary -------------------------------------------------------------------
 const allMigrations = db.prepare('SELECT * FROM schema_migrations ORDER BY version').all();
 console.log(`\n[migrate] ${allMigrations.length} migration(s) recorded in schema_migrations.`);
 console.log('[migrate] Database is up to date.\n');
