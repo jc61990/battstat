@@ -75,28 +75,17 @@ app.use((err, req, res, _next) => {
 
 const server = http.createServer(app);
 
-function isOriginAllowed(origin, req) {
-  // If an explicit allowed origin is configured, enforce it strictly.
-  if (ALLOWED_ORIGIN) return origin === ALLOWED_ORIGIN;
-  // No explicit config: accept connections whose Origin matches the Host header
-  // (same server, any IP/hostname), or has no Origin at all (non-browser clients).
-  // The valid session cookie checked below is the real authentication gate.
-  if (!origin) return true;
-  try {
-    const originUrl = new URL(origin);
-    const hostHeader = (req.headers['host'] || '').split(':')[0];
-    return originUrl.hostname === hostHeader
-        || originUrl.hostname === '127.0.0.1'
-        || originUrl.hostname === 'localhost';
-  } catch (_) { return false; }
-}
-
 const wss = new WebSocketServer({
   server,
   path: '/ws',
   verifyClient: ({ req }, done) => {
+    // Origin check: if ALLOWED_ORIGIN is set, enforce it strictly.
+    // Otherwise skip — the session cookie below is the authentication gate.
     const origin = req.headers['origin'];
-    if (!isOriginAllowed(origin, req)) { done(false, 403, 'Forbidden'); return; }
+    if (ALLOWED_ORIGIN && origin !== ALLOWED_ORIGIN) {
+      done(false, 403, 'Forbidden');
+      return;
+    }
     const cookie = req.headers['cookie'] || '';
     const match  = cookie.match(/battstat_session=([a-f0-9]{64})/);
     const token  = match ? match[1] : null;
