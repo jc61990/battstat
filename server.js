@@ -61,7 +61,7 @@ app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-app.get('*', (req, res, next) => {
+app.get('/{*splat}', (req, res, next) => {
   const token   = getTokenFromRequest(req);
   const session = token ? db.getSession(token) : null;
   if (!session) return res.redirect('/login');
