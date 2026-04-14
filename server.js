@@ -53,16 +53,24 @@ app.use(express.urlencoded({ extended: false, limit: '16kb' }));
 app.use('/api', rateLimit({ windowMs: 60000, max: 120, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/poll/device', rateLimit({ windowMs: 60000, max: 20, standardHeaders: true, legacyHeaders: false }));
 
-app.use(express.static(path.join(__dirname, 'public'), { etag: true, maxAge: '1m' }));
+// Serve static assets (css, js, images) but NOT index.html or login.html —
+// those are gated below so unauthenticated requests get redirected to /login.
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: true,
+  maxAge: '1m',
+  index: false,   // prevent express.static from serving index.html automatically
+}));
 
 app.use('/api/auth', authRoutes);
 app.use('/api',      routes);
 
+// Login page — always accessible
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-app.get('/{*splat}', (req, res, next) => {
+// All other routes — require a valid session
+app.get('/{*splat}', (req, res) => {
   const token   = getTokenFromRequest(req);
   const session = token ? db.getSession(token) : null;
   if (!session) return res.redirect('/login');
