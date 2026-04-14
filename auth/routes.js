@@ -12,13 +12,18 @@ function err(res, msg, code=400) { res.status(code).json({ ok: false, error: msg
 
 function setSessionCookie(res, token, expiresAt, persistent) {
   const maxAge = persistent ? (expiresAt - Math.floor(Date.now()/1000)) : undefined;
+  // secure=true is only set when HTTPS=true is explicitly configured —
+  // NOT based on NODE_ENV, because production deployments often use plain
+  // HTTP on an internal network. Setting secure=true over HTTP causes the
+  // browser to silently drop the cookie, breaking login with no error shown.
+  const secure = process.env.HTTPS === 'true';
   const opts = {
-    httpOnly:  true,
-    sameSite:  'Strict',
-    path:      '/',
+    httpOnly: true,
+    sameSite: 'Strict',
+    path:     '/',
+    secure,
     ...(maxAge ? { maxAge: maxAge * 1000 } : {}),
   };
-  if (process.env.NODE_ENV === 'production') opts.secure = true;
   res.cookie('battstat_session', token, opts);
 }
 

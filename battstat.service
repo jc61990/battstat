@@ -17,11 +17,14 @@ SyslogIdentifier=battstat
 
 Environment=NODE_ENV=production
 Environment=PORT=3000
-# Bind to localhost — put nginx/caddy in front for external HTTPS access.
-# Change to 0.0.0.0 only when a host firewall is restricting inbound access.
-Environment=HOST=127.0.0.1
+# Listens on all interfaces — restrict access with ufw/firewalld on the host.
+# Set to 127.0.0.1 if you are putting nginx/caddy in front as a reverse proxy.
+Environment=HOST=0.0.0.0
 # Uncomment and set to your public URL if using a reverse proxy:
 # Environment=ALLOWED_ORIGIN=https://battstat.internal.company.com
+# Set HTTPS=true when serving behind a TLS-terminating reverse proxy.
+# This enables the Secure flag on session cookies. Do NOT set over plain HTTP.
+# Environment=HTTPS=true
 Environment=DB_PATH=/opt/battstat/data/battstat.db
 
 # ── Systemd hardening ─────────────────────────────────────────────────────────
