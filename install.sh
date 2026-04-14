@@ -5,14 +5,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/common.sh
 source "${SCRIPT_DIR}/scripts/common.sh"
 
-header "BattStat — Installer"
+header "BattStat -- Installer"
 
 require_root
 detect_distro
 ensure_node
 ensure_service_user
 
-# ── Copy files if running from outside APP_DIR ────────────────────────────────
+# -- Copy files if running from outside APP_DIR --------------------------------
 if [ "$SCRIPT_DIR" != "$APP_DIR" ]; then
   info "Installing files to ${APP_DIR}..."
   mkdir -p "$APP_DIR"
@@ -27,14 +27,14 @@ if [ "$SCRIPT_DIR" != "$APP_DIR" ]; then
   fi
   success "Files copied to ${APP_DIR}"
 
-  # Preserve .git if source was a git clone — enables git-based upgrades later
+  # Preserve .git if source was a git clone -- enables git-based upgrades later
   if ! is_git_repo "$APP_DIR" && is_git_repo "$SCRIPT_DIR"; then
     info "Preserving git repository metadata..."
     cp -r "${SCRIPT_DIR}/.git" "${APP_DIR}/.git"
-    success "Git metadata preserved — 'sudo bash upgrade.sh' will use git pull"
+    success "Git metadata preserved -- 'sudo bash upgrade.sh' will use git pull"
   fi
 else
-  success "Running from ${APP_DIR} — no copy needed"
+  success "Running from ${APP_DIR} -- no copy needed"
 fi
 
 mkdir -p "$DATA_DIR"
@@ -55,12 +55,12 @@ if start_service; then
 
   if [ "$USER_COUNT" = "0" ]; then
     echo ""
-    info "No users found — creating the initial admin account..."
+    info "No users found -- creating the initial admin account..."
     echo ""
     DB_PATH="${DATA_DIR}/battstat.db" node "${APP_DIR}/scripts/create-admin.js"
   else
     echo ""
-    info "${USER_COUNT} existing user(s) found — skipping admin creation."
+    info "${USER_COUNT} existing user(s) found -- skipping admin creation."
   fi
 
   if command -v firewall-cmd &>/dev/null; then

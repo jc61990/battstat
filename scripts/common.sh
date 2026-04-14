@@ -1,6 +1,6 @@
 #!/bin/bash
 # Shared functions used by install.sh, upgrade.sh, and uninstall.sh.
-# Source this file — do not run directly.
+# Source this file -- do not run directly.
 
 APP_DIR="/opt/battstat"
 SERVICE_NAME="battstat"
@@ -9,17 +9,17 @@ SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 DATA_DIR="${APP_DIR}/data"
 BACKUP_DIR="/var/backups/battstat"
 
-# ── Colour helpers ────────────────────────────────────────────────────────────
+# -- Colour helpers ------------------------------------------------------------
 RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 
-info()    { echo -e "${CYAN}▸${RESET} $*"; }
-success() { echo -e "${GREEN}✓${RESET} $*"; }
-warn()    { echo -e "${YELLOW}⚠${RESET}  $*"; }
-error()   { echo -e "${RED}✗${RESET}  $*" >&2; }
-header()  { echo -e "\n${BOLD}$*${RESET}"; echo "$(echo "$*" | tr '[:print:]' '─')"; }
+info()    { echo -e "${CYAN}>${RESET} $*"; }
+success() { echo -e "${GREEN}[OK]${RESET} $*"; }
+warn()    { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
+error()   { echo -e "${RED}[ERR]${RESET}  $*" >&2; }
+header()  { echo -e "\n${BOLD}$*${RESET}"; echo "$(echo "$*" | tr '[:print:]' '-')"; }
 
-# ── Root guard ────────────────────────────────────────────────────────────────
+# -- Root guard ----------------------------------------------------------------
 require_root() {
   if [ "$(id -u)" -ne 0 ]; then
     error "This script must be run as root or with sudo."
@@ -27,9 +27,9 @@ require_root() {
   fi
 }
 
-# ── Detect distro / package manager ──────────────────────────────────────────
+# -- Detect distro / package manager ------------------------------------------
 # Sets DISTRO (debian|fedora|rhel) and PKG_MGR (apt-get|dnf|yum).
-# Safe to call multiple times — detection result is cached.
+# Safe to call multiple times -- detection result is cached.
 detect_distro() {
   if [ -n "${DISTRO:-}" ]; then return; fi  # already detected
   if command -v apt-get &>/dev/null; then
@@ -48,7 +48,7 @@ detect_distro() {
   info "Detected: ${DISTRO} (${PKG_MGR})"
 }
 
-# ── Build tools ───────────────────────────────────────────────────────────────
+# -- Build tools ---------------------------------------------------------------
 # better-sqlite3 and ldapjs compile native C++ addons during npm install.
 # On a minimal server image the compiler toolchain is often absent.
 ensure_build_tools() {
@@ -83,19 +83,19 @@ ensure_build_tools() {
   success "Build tools installed"
 }
 
-# ── Node.js install / check ───────────────────────────────────────────────────
+# -- Node.js install / check ---------------------------------------------------
 ensure_node() {
   if command -v node &>/dev/null; then
     local ver
     ver=$(node -e "process.stdout.write(process.version.split('.')[0].slice(1))")
     if [ "$ver" -lt 18 ]; then
-      warn "Node.js v${ver} found but 18+ is required — upgrading..."
+      warn "Node.js v${ver} found but 18+ is required -- upgrading..."
       install_node
     else
       success "Node.js $(node --version) already installed"
     fi
   else
-    info "Node.js not found — installing Node.js 20 LTS..."
+    info "Node.js not found -- installing Node.js 20 LTS..."
     install_node
   fi
   success "npm $(npm --version)"
@@ -116,7 +116,7 @@ install_node() {
   success "Node.js $(node --version) installed"
 }
 
-# ── System user ───────────────────────────────────────────────────────────────
+# -- System user ---------------------------------------------------------------
 ensure_service_user() {
   if id "$SERVICE_USER" &>/dev/null; then
     success "System user '${SERVICE_USER}' already exists"
@@ -127,7 +127,7 @@ ensure_service_user() {
   fi
 }
 
-# ── Git detection ─────────────────────────────────────────────────────────────
+# -- Git detection -------------------------------------------------------------
 is_git_repo() {
   git -C "$1" rev-parse --git-dir &>/dev/null 2>&1
 }
@@ -146,7 +146,7 @@ get_git_remote() {
   git -C "$APP_DIR" remote get-url origin 2>/dev/null || echo ""
 }
 
-# ── npm install ───────────────────────────────────────────────────────────────
+# -- npm install ---------------------------------------------------------------
 npm_install() {
   info "Installing Node.js dependencies..."
   cd "$APP_DIR"
@@ -157,14 +157,14 @@ npm_install() {
       | grep -v "^npm notice" \
       | grep -v "funding" \
       | grep -v "looking for funding"; then
-    error "npm install failed — check output above"
+    error "npm install failed -- check output above"
     exit 1
   fi
 
   success "Dependencies installed"
 }
 
-# ── Permissions ───────────────────────────────────────────────────────────────
+# -- Permissions ---------------------------------------------------------------
 fix_permissions() {
   chown -R "${SERVICE_USER}:${SERVICE_USER}" "$APP_DIR"
   chmod 750 "$APP_DIR"
@@ -178,7 +178,7 @@ fix_permissions() {
   fi
 }
 
-# ── Systemd ───────────────────────────────────────────────────────────────────
+# -- Systemd -------------------------------------------------------------------
 install_service() {
   info "Installing systemd service..."
   cp "${APP_DIR}/battstat.service" "$SERVICE_FILE"
@@ -215,7 +215,7 @@ disable_service() {
   fi
 }
 
-# ── Backup ────────────────────────────────────────────────────────────────────
+# -- Backup --------------------------------------------------------------------
 backup_data() {
   local label="${1:-manual}"
   local ts dest
@@ -234,7 +234,7 @@ backup_data() {
     success "Database backed up to ${dest}/battstat.db"
     echo "$dest"
   else
-    warn "No database found at ${DATA_DIR}/battstat.db — skipping backup"
+    warn "No database found at ${DATA_DIR}/battstat.db -- skipping backup"
     echo ""
   fi
 }
@@ -255,12 +255,12 @@ list_backups() {
   fi
 }
 
-# ── Post-install summary ──────────────────────────────────────────────────────
+# -- Post-install summary ------------------------------------------------------
 print_dashboard_url() {
   local ip
   ip=$(hostname -I 2>/dev/null | awk '{print $1}')
   echo ""
-  echo -e "${GREEN}${BOLD}  Dashboard → http://${ip}:3000${RESET}"
+  echo -e "${GREEN}${BOLD}  Dashboard -> http://${ip}:3000${RESET}"
   echo ""
 }
 

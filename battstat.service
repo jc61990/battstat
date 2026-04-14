@@ -1,5 +1,5 @@
 [Unit]
-Description=BattStat — UPS Battery Health Monitor
+Description=BattStat - UPS Battery Health Monitor
 After=network.target
 Wants=network-online.target
 
@@ -17,7 +17,7 @@ SyslogIdentifier=battstat
 
 Environment=NODE_ENV=production
 Environment=PORT=3000
-# Listens on all interfaces — restrict access with ufw/firewalld on the host.
+# Listens on all interfaces -- restrict access with ufw/firewalld on the host.
 # Set to 127.0.0.1 if you are putting nginx/caddy in front as a reverse proxy.
 Environment=HOST=0.0.0.0
 # Uncomment and set to your public URL if using a reverse proxy:
@@ -27,7 +27,7 @@ Environment=HOST=0.0.0.0
 # Environment=HTTPS=true
 Environment=DB_PATH=/opt/battstat/data/battstat.db
 
-# ── Systemd hardening ─────────────────────────────────────────────────────────
+# -- Systemd hardening ---------------------------------------------------------
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
@@ -42,7 +42,7 @@ ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
 # NOTE: MemoryDenyWriteExecute and SystemCallFilter are intentionally omitted.
-# Node.js/V8 requires W+X memory for JIT compilation — those flags cause a
+# Node.js/V8 requires W+X memory for JIT compilation -- those flags cause a
 # SIGTRAP crash on modern kernels. All other hardening above remains effective.
 
 [Install]

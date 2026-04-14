@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/common.sh
 source "${SCRIPT_DIR}/scripts/common.sh"
 
-# ── Argument parsing ──────────────────────────────────────────────────────────
+# -- Argument parsing ----------------------------------------------------------
 PURGE_DATA=0
 KEEP_USER=0
 FORCE=0
@@ -33,8 +33,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# ── Pre-flight ────────────────────────────────────────────────────────────────
-header "BattStat — Uninstall"
+# -- Pre-flight ----------------------------------------------------------------
+header "BattStat -- Uninstall"
 require_root
 
 APP_INSTALLED=0
@@ -47,7 +47,7 @@ if [ "$APP_INSTALLED" -eq 0 ] && [ "$SERVICE_INSTALLED" -eq 0 ]; then
   exit 0
 fi
 
-# ── Show what will happen ─────────────────────────────────────────────────────
+# -- Show what will happen -----------------------------------------------------
 echo ""
 echo "The following will be removed:"
 [ "$SERVICE_INSTALLED" -eq 1 ] && echo "  Systemd service:   ${SERVICE_FILE}"
@@ -71,12 +71,12 @@ if [ "$FORCE" -ne 1 ]; then
   fi
 fi
 
-# ── Stop and disable service ──────────────────────────────────────────────────
+# -- Stop and disable service --------------------------------------------------
 header "Stopping service"
 stop_service
 disable_service
 
-# ── Handle data ───────────────────────────────────────────────────────────────
+# -- Handle data ---------------------------------------------------------------
 header "Data"
 if [ "$PURGE_DATA" -eq 1 ]; then
   if [ -d "$DATA_DIR" ]; then
@@ -95,30 +95,30 @@ else
     info "To restore after reinstalling:"
     echo "  sudo cp ${SAVE_DEST}/battstat.db ${DATA_DIR}/"
   else
-    info "No data directory found — nothing to preserve"
+    info "No data directory found -- nothing to preserve"
   fi
 fi
 
-# ── Remove systemd unit ───────────────────────────────────────────────────────
+# -- Remove systemd unit -------------------------------------------------------
 header "Removing systemd service"
 if [ -f "$SERVICE_FILE" ]; then
   rm -f "$SERVICE_FILE"
   systemctl daemon-reload
   success "Service file removed"
 else
-  info "Service file not found — already removed"
+  info "Service file not found -- already removed"
 fi
 
-# ── Remove application files ──────────────────────────────────────────────────
+# -- Remove application files --------------------------------------------------
 header "Removing application files"
 if [ -d "$APP_DIR" ]; then
   rm -rf "$APP_DIR"
   success "Removed ${APP_DIR}"
 else
-  info "${APP_DIR} not found — already removed"
+  info "${APP_DIR} not found -- already removed"
 fi
 
-# ── Remove system user ────────────────────────────────────────────────────────
+# -- Remove system user --------------------------------------------------------
 if [ "$KEEP_USER" -eq 0 ]; then
   header "Removing system user"
   if id "$SERVICE_USER" &>/dev/null; then
@@ -129,7 +129,7 @@ if [ "$KEEP_USER" -eq 0 ]; then
   fi
 fi
 
-# ── Done ──────────────────────────────────────────────────────────────────────
+# -- Done ----------------------------------------------------------------------
 header "Uninstall complete"
 if [ "$PURGE_DATA" -ne 1 ] && [ -d "${BACKUP_DIR}/final_uninstall" ]; then
   success "Data preserved at ${BACKUP_DIR}/final_uninstall/"
