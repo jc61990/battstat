@@ -34,13 +34,14 @@ app.set('trust proxy', false);
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc:  ["'self'"],
-      styleSrc:   ["'self'", "'unsafe-inline'"],
-      connectSrc: ["'self'", 'ws:', 'wss:'],
-      imgSrc:     ["'self'", 'data:'],
-      frameSrc:   ["'none'"],
-      objectSrc:  ["'none'"],
+      defaultSrc:      ["'self'"],
+      scriptSrc:       ["'self'", "'unsafe-inline'"],
+      scriptSrcAttr:   ["'unsafe-inline'"],  // allow onclick="..." attributes in HTML
+      styleSrc:        ["'self'", "'unsafe-inline'"],
+      connectSrc:      ["'self'", 'ws:', 'wss:'],
+      imgSrc:          ["'self'", 'data:'],
+      frameSrc:        ["'none'"],
+      objectSrc:       ["'none'"],
     },
   },
   crossOriginEmbedderPolicy: false,
