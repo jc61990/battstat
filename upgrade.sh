@@ -14,14 +14,14 @@ usage() {
   echo "Usage: sudo bash upgrade.sh [OPTIONS]"
   echo ""
   echo "Options:"
-  echo "  --from <path>    Upgrade from a local directory instead of git pull"
+  echo "  --from <path>    Upgrade from a specific directory instead of auto-detecting"
   echo "  --skip-backup    Skip the pre-upgrade database backup"
   echo "  --force          Skip confirmation prompt"
   echo "  -h, --help       Show this help"
   echo ""
   echo "Examples:"
-  echo "  sudo bash upgrade.sh                         # git pull (requires git clone install)"
-  echo "  sudo bash upgrade.sh --from /tmp/battstat    # upgrade from extracted zip"
+  echo "  sudo bash upgrade.sh                      # auto-detects source (git pull or script dir)"
+  echo "  sudo bash upgrade.sh --from /tmp/battstat # upgrade from extracted zip"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -43,19 +43,41 @@ if [ ! -d "$APP_DIR" ]; then
   exit 1
 fi
 
+# ── Auto-detect upgrade mode ──────────────────────────────────────────────────
+# Priority:
+#   1. --from <path> was explicitly passed
+#   2. APP_DIR itself is a git repo → git pull
+#   3. Script is running from a different directory that IS a git repo → git pull there, then sync
+#   4. Script is running from a different directory that is NOT a git repo → directory sync
+#   5. Nothing works → error
+
 if [ -n "$SOURCE_DIR" ]; then
   UPGRADE_MODE="directory"
   [ -d "$SOURCE_DIR" ] || { error "Source directory not found: ${SOURCE_DIR}"; exit 1; }
   info "Upgrade mode: from directory ${SOURCE_DIR}"
+
 elif is_git_repo "$APP_DIR"; then
   UPGRADE_MODE="git"
-  info "Upgrade mode: git pull"
+  info "Upgrade mode: git pull in ${APP_DIR}"
   info "Remote:  $(get_git_remote)"
   info "Current: $(get_git_version)"
+
+elif [ "$SCRIPT_DIR" != "$APP_DIR" ] && is_git_repo "$SCRIPT_DIR"; then
+  # Running from a git repo that isn't the install dir (e.g. /opt/battstat-src)
+  UPGRADE_MODE="git-then-sync"
+  SOURCE_DIR="$SCRIPT_DIR"
+  info "Upgrade mode: git pull in ${SCRIPT_DIR} → sync to ${APP_DIR}"
+  info "Remote:  $(git -C "$SCRIPT_DIR" remote get-url origin 2>/dev/null || echo 'none')"
+  info "Current: $(git -C "$SCRIPT_DIR" describe --tags --always 2>/dev/null || git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+
+elif [ "$SCRIPT_DIR" != "$APP_DIR" ]; then
+  # Running from a plain directory (not git) — sync it
+  UPGRADE_MODE="directory"
+  SOURCE_DIR="$SCRIPT_DIR"
+  info "Upgrade mode: sync from ${SCRIPT_DIR} to ${APP_DIR}"
+
 else
-  error "${APP_DIR} is not a git repo and --from was not specified."
-  echo ""
-  echo "To upgrade from a zip: sudo bash upgrade.sh --from /path/to/battstat"
+  error "Cannot determine upgrade source. Use --from <path> to specify a source directory."
   exit 1
 fi
 
@@ -107,6 +129,7 @@ ROLLBACK_NEEDED=1
 
 # ── Step 3/6: Update files ────────────────────────────────────────────────────
 header "Step 3/6: Update files"
+
 if [ "$UPGRADE_MODE" = "git" ]; then
   info "Fetching from origin..."
   git -C "$APP_DIR" fetch origin
@@ -118,11 +141,36 @@ if [ "$UPGRADE_MODE" = "git" ]; then
     info "${INCOMING} new commit(s):"
     git -C "$APP_DIR" log HEAD..origin/HEAD --oneline 2>/dev/null | head -20 | sed 's/^/    /'
   fi
-
   git -C "$APP_DIR" pull --ff-only
   success "Updated to $(get_git_version)"
+
+elif [ "$UPGRADE_MODE" = "git-then-sync" ]; then
+  info "Pulling latest from git in ${SOURCE_DIR}..."
+  git -C "$SOURCE_DIR" fetch origin
+
+  INCOMING=$(git -C "$SOURCE_DIR" log HEAD..origin/HEAD --oneline 2>/dev/null | wc -l)
+  if [ "$INCOMING" -eq 0 ]; then
+    warn "Already up to date — no new commits"
+  else
+    info "${INCOMING} new commit(s):"
+    git -C "$SOURCE_DIR" log HEAD..origin/HEAD --oneline 2>/dev/null | head -20 | sed 's/^/    /'
+  fi
+  git -C "$SOURCE_DIR" pull --ff-only
+
+  info "Syncing updated files to ${APP_DIR}..."
+  if command -v rsync &>/dev/null; then
+    rsync -a --delete \
+      --exclude='data/' --exclude='node_modules/' --exclude='.git/' \
+      "${SOURCE_DIR}/" "${APP_DIR}/"
+  else
+    find "$SOURCE_DIR" -mindepth 1 -maxdepth 1 \
+      ! -name 'data' ! -name 'node_modules' ! -name '.git' \
+      -exec cp -r {} "$APP_DIR/" \;
+  fi
+  success "Synced to $(git -C "$SOURCE_DIR" rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+
 else
-  info "Syncing files from ${SOURCE_DIR}..."
+  info "Syncing files from ${SOURCE_DIR} to ${APP_DIR}..."
   if command -v rsync &>/dev/null; then
     rsync -a --delete \
       --exclude='data/' --exclude='node_modules/' --exclude='.git/' \
