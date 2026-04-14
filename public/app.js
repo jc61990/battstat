@@ -372,6 +372,7 @@ function renderDeviceTable() {
       case 'batt': av = pa?.batt_capacity ?? -1; bv = pb?.batt_capacity ?? -1; break;
       case 'temp': av = pa?.batt_temperature ?? -1; bv = pb?.batt_temperature ?? -1; break;
       case 'replace': av = a.battery_installed || 'z'; bv = b.battery_installed || 'z'; break;
+      case 'model': av = (pa?.model_snmp || a.model || '').toLowerCase(); bv = (pb?.model_snmp || b.model || '').toLowerCase(); break;
       default: return 0;
     }
     if (av < bv) return -_sortDir;
@@ -390,7 +391,7 @@ function renderDeviceTable() {
 
   const tbody = document.getElementById('device-tbody');
   if (!devs.length) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="13">No devices match current filters</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="15">No devices match current filters</td></tr>`;
     return;
   }
 
@@ -412,6 +413,8 @@ function renderDeviceTable() {
       <td>${runtime}</td>
       <td>${load}</td>
       <td>${replacePill(d)}</td>
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p?.model_snmp || d.model || '')}">${esc(p?.model_snmp || d.model || '—')}</td>
+      <td class="mono" style="font-size:11px">${esc(d.part_number || '—')}</td>
       <td class="last-seen">${fmtTs(p?.polled_at)}</td>
       <td onclick="event.stopPropagation()">
         <div style="display:flex;gap:4px">

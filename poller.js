@@ -3,11 +3,11 @@
 const snmp = require('net-snmp');
 const { getDevices, getDevice, getSnmpConfig, savePollResult, pruneOldPolls } = require('./db');
 
-let pollTimer = null;
-let wsClients = new Set();
-let isPolling = false;
+let pollTimer  = null;
+let wsClients  = new Set();
+let isPolling  = false;
 
-function registerWsClient(ws) { wsClients.add(ws); }
+function registerWsClient(ws)   { wsClients.add(ws); }
 function unregisterWsClient(ws) { wsClients.delete(ws); }
 
 function broadcast(event, data) {
@@ -17,9 +17,13 @@ function broadcast(event, data) {
   }
 }
 
+// ── OID definitions ───────────────────────────────────────────────────────────
+
 const OID = {
-  sysDescr:           '1.3.6.1.2.1.1.1.0',
-  sysName:            '1.3.6.1.2.1.1.5.0',
+  sysDescr:  '1.3.6.1.2.1.1.1.0',
+  sysName:   '1.3.6.1.2.1.1.5.0',
+
+  // APC
   apcBattCapacity:    '1.3.6.1.4.1.318.1.1.1.2.2.1.0',
   apcBattStatus:      '1.3.6.1.4.1.318.1.1.1.2.1.1.0',
   apcBattTempC:       '1.3.6.1.4.1.318.1.1.1.2.2.2.0',
@@ -31,12 +35,16 @@ const OID = {
   apcModel:           '1.3.6.1.4.1.318.1.1.1.1.1.1.0',
   apcSerial:          '1.3.6.1.4.1.318.1.1.1.1.2.3.0',
   apcFirmware:        '1.3.6.1.4.1.318.1.1.1.1.2.1.0',
+
+  // Eaton / Powerware
   eatonBattCapacity:  '1.3.6.1.4.1.534.1.2.4.0',
   eatonBattTemp:      '1.3.6.1.4.1.534.1.2.2.0',
   eatonBattRunTime:   '1.3.6.1.4.1.534.1.2.1.0',
   eatonInputVoltage:  '1.3.6.1.4.1.534.1.3.4.1.2.1',
   eatonOutputVoltage: '1.3.6.1.4.1.534.1.4.4.1.2.1',
   eatonOutputLoad:    '1.3.6.1.4.1.534.1.4.1.0',
+
+  // CyberPower
   cyberBattCapacity:  '1.3.6.1.4.1.3808.1.1.1.2.2.1.0',
   cyberBattTemp:      '1.3.6.1.4.1.3808.1.1.1.2.2.2.0',
   cyberBattRunTime:   '1.3.6.1.4.1.3808.1.1.1.2.2.4.0',
@@ -47,34 +55,34 @@ const OID = {
   cyberModel:         '1.3.6.1.4.1.3808.1.1.1.1.1.1.0',
   cyberSerial:        '1.3.6.1.4.1.3808.1.1.1.1.2.3.0',
 
-  // Tripp Lite -- LX Platform / WEBCARDLX (newer, firmware 15.x+)
-  // Enterprise OID prefix: 1.3.6.1.4.1.850
-  tlBattCapacity:     '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.4.1',  // percent
-  tlBattStatus:       '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.3.1',  // 1=unknown,2=normal,3=low,4=depleted
-  tlBattRunTime:      '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.5.1',  // seconds
-  tlBattTemp:         '1.3.6.1.4.1.850.1.1.3.1.2.1.1.7',      // celsius
-  tlInputVoltage:     '1.3.6.1.4.1.850.1.1.3.1.3.2.2.1.3.1',  // V
-  tlOutputVoltage:    '1.3.6.1.4.1.850.1.1.3.1.3.3.1.3.1',    // V
-  tlOutputLoad:       '1.3.6.1.4.1.850.1.1.3.1.3.3.1.10.1',   // percent
-  tlModel:            '1.3.6.1.4.1.850.1.1.1.2.1.6.1',
-  tlSerial:           '1.3.6.1.4.1.850.1.1.1.2.1.7.1',
-  tlFirmware:         '1.3.6.1.4.1.850.1.1.1.2.1.5.1',
-  tlNextReplaceDate:  '1.3.6.1.4.1.850.1.1.3.1.3.1.5.1.6',    // days until replace
+  // Tripp Lite -- LX Platform / WEBCARDLX (firmware 15.x+)
+  tlBattCapacity:    '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.4.1',
+  tlBattStatus:      '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.3.1',
+  tlBattRunTime:     '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.5.1',
+  tlBattTemp:        '1.3.6.1.4.1.850.1.1.3.1.2.1.1.7',
+  tlInputVoltage:    '1.3.6.1.4.1.850.1.1.3.1.3.2.2.1.3.1',
+  tlOutputVoltage:   '1.3.6.1.4.1.850.1.1.3.1.3.3.1.3.1',
+  tlOutputLoad:      '1.3.6.1.4.1.850.1.1.3.1.3.3.1.10.1',
+  tlModel:           '1.3.6.1.4.1.850.1.1.1.2.1.6.1',
+  tlSerial:          '1.3.6.1.4.1.850.1.1.1.2.1.7.1',
+  tlFirmware:        '1.3.6.1.4.1.850.1.1.1.2.1.5.1',
+  tlNextReplaceDate: '1.3.6.1.4.1.850.1.1.3.1.3.1.5.1.6',
 
   // Tripp Lite -- RFC 1628 standard UPS MIB (older SNMPWEBCARD, widely supported)
-  rfc1628BattCapacity:   '1.3.6.1.2.1.33.1.2.4.0',   // percent
-  rfc1628BattStatus:     '1.3.6.1.2.1.33.1.2.1.0',   // 1=unknown,2=normal,3=low,4=depleted
-  rfc1628BattRunTime:    '1.3.6.1.2.1.33.1.2.3.0',   // seconds (TimeTicks / 100)
-  rfc1628BattTemp:       '1.3.6.1.2.1.33.1.2.7.0',   // celsius
-  rfc1628InputVoltage:   '1.3.6.1.2.1.33.1.3.3.1.3.1',
-  rfc1628OutputVoltage:  '1.3.6.1.2.1.33.1.4.4.1.2.1',
-  rfc1628OutputLoad:     '1.3.6.1.2.1.33.1.4.4.1.5.1', // percent
+  rfc1628BattCapacity:  '1.3.6.1.2.1.33.1.2.4.0',
+  rfc1628BattStatus:    '1.3.6.1.2.1.33.1.2.1.0',
+  rfc1628BattRunTime:   '1.3.6.1.2.1.33.1.2.3.0',
+  rfc1628BattTemp:      '1.3.6.1.2.1.33.1.2.7.0',
+  rfc1628InputVoltage:  '1.3.6.1.2.1.33.1.3.3.1.3.1',
+  rfc1628OutputVoltage: '1.3.6.1.2.1.33.1.4.4.1.2.1',
+  rfc1628OutputLoad:    '1.3.6.1.2.1.33.1.4.4.1.5.1',
 };
 
-const APC_BATT_STATUS   = { 1:'unknown', 2:'batteryNormal', 3:'batteryLow', 4:'batteryInFaultCondition' };
-const CYBER_BATT_STATUS = { 1:'unknown', 2:'batteryNormal', 3:'batteryLow', 4:'batteryDepleted' };
-const TL_BATT_STATUS    = { 1:'unknown', 2:'batteryNormal', 3:'batteryLow', 4:'batteryDepleted' };
-const RFC1628_BATT_STATUS = { 1:'unknown', 2:'batteryNormal', 3:'batteryLow', 4:'batteryDepleted' };
+const APC_BATT_STATUS    = { 1:'unknown', 2:'batteryNormal', 3:'batteryLow', 4:'batteryInFaultCondition' };
+const CYBER_BATT_STATUS  = { 1:'unknown', 2:'batteryNormal', 3:'batteryLow', 4:'batteryDepleted' };
+const TL_BATT_STATUS     = { 1:'unknown', 2:'batteryNormal', 3:'batteryLow', 4:'batteryDepleted' };
+
+// ── SNMP session builder ──────────────────────────────────────────────────────
 
 function buildSnmpV3Options(cfg) {
   const authProto = cfg.auth_protocol === 'SHA256'
@@ -97,9 +105,9 @@ function buildSnmpV3Options(cfg) {
     sessionOpts: {
       version:    snmp.Version3,
       idBitsSize: 32,
-      port:       cfg.port      || 161,
+      port:       cfg.port       || 161,
       timeout:    cfg.timeout_ms || 5000,
-      retries:    cfg.retries   ?? 1,
+      retries:    cfg.retries    ?? 1,
     },
     userOpts: {
       name:         cfg.security_name,
@@ -112,6 +120,8 @@ function buildSnmpV3Options(cfg) {
   };
 }
 
+// ── Vendor detection ──────────────────────────────────────────────────────────
+
 function detectVendor(device) {
   const desc = (device.model || '').toLowerCase();
   if (desc.includes('eaton') || desc.includes('powerware') || desc.includes('mg')) return 'eaton';
@@ -120,61 +130,9 @@ function detectVendor(device) {
   return 'apc';
 }
 
+// ── OID list per vendor ───────────────────────────────────────────────────────
+
 function oidListForVendor(vendor) {
-  if (vendor === 'tripplite') {
-    // Prefer LX Platform MIB values, fall back to RFC 1628 if not present
-    const tlCap  = getInt(OID.tlBattCapacity);
-    const rfcCap = getInt(OID.rfc1628BattCapacity);
-    const batt_capacity = tlCap ?? rfcCap;
-
-    const tlSi  = getInt(OID.tlBattStatus);
-    const rfcSi = getInt(OID.rfc1628BattStatus);
-    const si    = tlSi ?? rfcSi;
-    const batt_status = si !== null ? (TL_BATT_STATUS[si] || String(si)) : null;
-
-    const tlRt  = getInt(OID.tlBattRunTime);
-    const rfcRt = getInt(OID.rfc1628BattRunTime);
-    // LX Platform: seconds. RFC 1628: TimeTicks (hundredths of seconds)
-    const batt_run_time = tlRt !== null
-      ? Math.floor(tlRt / 60)
-      : rfcRt !== null ? Math.floor(rfcRt / 6000) : null;
-
-    const tlTemp  = getInt(OID.tlBattTemp);
-    const rfcTemp = getInt(OID.rfc1628BattTemp);
-
-    const tlInV  = getInt(OID.tlInputVoltage);
-    const rfcInV = getInt(OID.rfc1628InputVoltage);
-
-    const tlOutV  = getInt(OID.tlOutputVoltage);
-    const rfcOutV = getInt(OID.rfc1628OutputVoltage);
-
-    const tlLoad  = getInt(OID.tlOutputLoad);
-    const rfcLoad = getInt(OID.rfc1628OutputLoad);
-
-    // Next replace date from LX Platform is in days-until -- convert to a date string
-    const daysUntil = getInt(OID.tlNextReplaceDate);
-    let batt_replace_date = null;
-    if (daysUntil !== null) {
-      const d = new Date();
-      d.setDate(d.getDate() + daysUntil);
-      batt_replace_date = d.toISOString().slice(0, 10);
-    }
-
-    return {
-      batt_capacity,
-      batt_status,
-      batt_temperature: tlTemp ?? rfcTemp,
-      batt_run_time,
-      batt_replace_date,
-      input_voltage:  tlInV ?? rfcInV,
-      output_voltage: tlOutV ?? rfcOutV,
-      output_load:    tlLoad ?? rfcLoad,
-      model_snmp:  get(OID.tlModel) || get(OID.sysDescr),
-      serial_snmp: get(OID.tlSerial),
-      firmware:    get(OID.tlFirmware),
-    };
-  }
-
   if (vendor === 'eaton') {
     return [OID.sysDescr, OID.sysName,
       OID.eatonBattCapacity, OID.eatonBattTemp, OID.eatonBattRunTime,
@@ -187,7 +145,7 @@ function oidListForVendor(vendor) {
       OID.cyberModel, OID.cyberSerial];
   }
   if (vendor === 'tripplite') {
-    // Query both the LX Platform MIB and RFC 1628 -- whichever responds wins
+    // Query both LX Platform and RFC 1628 -- parseVarbinds picks whichever responds
     return [OID.sysDescr, OID.sysName,
       OID.tlBattCapacity, OID.tlBattStatus, OID.tlBattRunTime, OID.tlBattTemp,
       OID.tlInputVoltage, OID.tlOutputVoltage, OID.tlOutputLoad,
@@ -196,12 +154,15 @@ function oidListForVendor(vendor) {
       OID.rfc1628BattTemp, OID.rfc1628InputVoltage, OID.rfc1628OutputVoltage,
       OID.rfc1628OutputLoad];
   }
+  // APC (default)
   return [OID.sysDescr, OID.sysName,
     OID.apcBattCapacity, OID.apcBattStatus, OID.apcBattTempC,
     OID.apcBattRunTime, OID.apcBattReplaceDate,
     OID.apcInputVoltage, OID.apcOutputVoltage, OID.apcOutputLoad,
     OID.apcModel, OID.apcSerial, OID.apcFirmware];
 }
+
+// ── Parse varbinds into normalised result object ──────────────────────────────
 
 function parseVarbinds(varbinds, vendor) {
   const vals = {};
@@ -210,40 +171,25 @@ function parseVarbinds(varbinds, vendor) {
     const raw = vb.value;
     vals[vb.oid] = Buffer.isBuffer(raw) ? raw.toString('utf8').replace(/\0/g, '').trim() : raw;
   }
+
   const get    = (oid) => vals[oid] ?? null;
   const getInt = (oid) => { const v = get(oid); return v !== null ? parseInt(v, 10) : null; };
 
   if (vendor === 'tripplite') {
-    // Prefer LX Platform MIB values, fall back to RFC 1628 if not present
-    const tlCap  = getInt(OID.tlBattCapacity);
-    const rfcCap = getInt(OID.rfc1628BattCapacity);
-    const batt_capacity = tlCap ?? rfcCap;
+    // Prefer LX Platform MIB values; fall back to RFC 1628 if not present
+    const batt_capacity = getInt(OID.tlBattCapacity) ?? getInt(OID.rfc1628BattCapacity);
 
-    const tlSi  = getInt(OID.tlBattStatus);
-    const rfcSi = getInt(OID.rfc1628BattStatus);
-    const si    = tlSi ?? rfcSi;
+    const si = getInt(OID.tlBattStatus) ?? getInt(OID.rfc1628BattStatus);
     const batt_status = si !== null ? (TL_BATT_STATUS[si] || String(si)) : null;
 
     const tlRt  = getInt(OID.tlBattRunTime);
     const rfcRt = getInt(OID.rfc1628BattRunTime);
-    // LX Platform: seconds. RFC 1628: TimeTicks (hundredths of seconds)
+    // LX Platform runtime: seconds. RFC 1628: TimeTicks (hundredths of a second)
     const batt_run_time = tlRt !== null
       ? Math.floor(tlRt / 60)
       : rfcRt !== null ? Math.floor(rfcRt / 6000) : null;
 
-    const tlTemp  = getInt(OID.tlBattTemp);
-    const rfcTemp = getInt(OID.rfc1628BattTemp);
-
-    const tlInV  = getInt(OID.tlInputVoltage);
-    const rfcInV = getInt(OID.rfc1628InputVoltage);
-
-    const tlOutV  = getInt(OID.tlOutputVoltage);
-    const rfcOutV = getInt(OID.rfc1628OutputVoltage);
-
-    const tlLoad  = getInt(OID.tlOutputLoad);
-    const rfcLoad = getInt(OID.rfc1628OutputLoad);
-
-    // Next replace date from LX Platform is in days-until -- convert to a date string
+    // Next replace date from LX Platform is days-until -- convert to ISO date string
     const daysUntil = getInt(OID.tlNextReplaceDate);
     let batt_replace_date = null;
     if (daysUntil !== null) {
@@ -255,12 +201,12 @@ function parseVarbinds(varbinds, vendor) {
     return {
       batt_capacity,
       batt_status,
-      batt_temperature: tlTemp ?? rfcTemp,
+      batt_temperature:  getInt(OID.tlBattTemp)       ?? getInt(OID.rfc1628BattTemp),
       batt_run_time,
       batt_replace_date,
-      input_voltage:  tlInV ?? rfcInV,
-      output_voltage: tlOutV ?? rfcOutV,
-      output_load:    tlLoad ?? rfcLoad,
+      input_voltage:     getInt(OID.tlInputVoltage)   ?? getInt(OID.rfc1628InputVoltage),
+      output_voltage:    getInt(OID.tlOutputVoltage)  ?? getInt(OID.rfc1628OutputVoltage),
+      output_load:       getInt(OID.tlOutputLoad)     ?? getInt(OID.rfc1628OutputLoad),
       model_snmp:  get(OID.tlModel) || get(OID.sysDescr),
       serial_snmp: get(OID.tlSerial),
       firmware:    get(OID.tlFirmware),
@@ -270,44 +216,57 @@ function parseVarbinds(varbinds, vendor) {
   if (vendor === 'eaton') {
     const rt = getInt(OID.eatonBattRunTime);
     return {
-      batt_capacity: getInt(OID.eatonBattCapacity), batt_status: null,
+      batt_capacity:    getInt(OID.eatonBattCapacity),
+      batt_status:      null,
       batt_temperature: getInt(OID.eatonBattTemp),
-      batt_run_time: rt !== null ? Math.floor(rt / 60) : null,
+      batt_run_time:    rt !== null ? Math.floor(rt / 60) : null,
       batt_replace_date: null,
-      input_voltage: getInt(OID.eatonInputVoltage), output_voltage: getInt(OID.eatonOutputVoltage),
-      output_load: getInt(OID.eatonOutputLoad), model_snmp: get(OID.sysDescr),
-      serial_snmp: null, firmware: null,
+      input_voltage:    getInt(OID.eatonInputVoltage),
+      output_voltage:   getInt(OID.eatonOutputVoltage),
+      output_load:      getInt(OID.eatonOutputLoad),
+      model_snmp:       get(OID.sysDescr),
+      serial_snmp:      null,
+      firmware:         null,
     };
   }
+
   if (vendor === 'cyber') {
     const si = getInt(OID.cyberBattStatus);
     const rt = getInt(OID.cyberBattRunTime);
     return {
-      batt_capacity: getInt(OID.cyberBattCapacity),
-      batt_status: si !== null ? (CYBER_BATT_STATUS[si] || String(si)) : null,
+      batt_capacity:    getInt(OID.cyberBattCapacity),
+      batt_status:      si !== null ? (CYBER_BATT_STATUS[si] || String(si)) : null,
       batt_temperature: getInt(OID.cyberBattTemp),
-      batt_run_time: rt !== null ? Math.floor(rt / 60) : null,
+      batt_run_time:    rt !== null ? Math.floor(rt / 60) : null,
       batt_replace_date: null,
-      input_voltage: getInt(OID.cyberInputVoltage), output_voltage: getInt(OID.cyberOutputVoltage),
-      output_load: getInt(OID.cyberOutputLoad),
-      model_snmp: get(OID.cyberModel) || get(OID.sysDescr), serial_snmp: get(OID.cyberSerial),
-      firmware: null,
+      input_voltage:    getInt(OID.cyberInputVoltage),
+      output_voltage:   getInt(OID.cyberOutputVoltage),
+      output_load:      getInt(OID.cyberOutputLoad),
+      model_snmp:       get(OID.cyberModel) || get(OID.sysDescr),
+      serial_snmp:      get(OID.cyberSerial),
+      firmware:         null,
     };
   }
+
+  // APC (default)
   const si = getInt(OID.apcBattStatus);
   const rt = getInt(OID.apcBattRunTime);
   return {
-    batt_capacity: getInt(OID.apcBattCapacity),
-    batt_status: si !== null ? (APC_BATT_STATUS[si] || String(si)) : null,
+    batt_capacity:    getInt(OID.apcBattCapacity),
+    batt_status:      si !== null ? (APC_BATT_STATUS[si] || String(si)) : null,
     batt_temperature: getInt(OID.apcBattTempC),
-    batt_run_time: rt !== null ? Math.floor(rt / 6000) : null,
+    batt_run_time:    rt !== null ? Math.floor(rt / 6000) : null,
     batt_replace_date: get(OID.apcBattReplaceDate) || null,
-    input_voltage: getInt(OID.apcInputVoltage), output_voltage: getInt(OID.apcOutputVoltage),
-    output_load: getInt(OID.apcOutputLoad),
-    model_snmp: get(OID.apcModel) || get(OID.sysDescr), serial_snmp: get(OID.apcSerial),
-    firmware: get(OID.apcFirmware),
+    input_voltage:    getInt(OID.apcInputVoltage),
+    output_voltage:   getInt(OID.apcOutputVoltage),
+    output_load:      getInt(OID.apcOutputLoad),
+    model_snmp:       get(OID.apcModel) || get(OID.sysDescr),
+    serial_snmp:      get(OID.apcSerial),
+    firmware:         get(OID.apcFirmware),
   };
 }
+
+// ── Poll a single device ──────────────────────────────────────────────────────
 
 function pollDevice(device, cfg) {
   return new Promise((resolve) => {
@@ -336,6 +295,8 @@ function pollDevice(device, cfg) {
     });
   });
 }
+
+// ── Poll cycle ────────────────────────────────────────────────────────────────
 
 async function runPollCycle() {
   if (isPolling) return;
