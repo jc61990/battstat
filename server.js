@@ -36,14 +36,20 @@ app.use(helmet({
     directives: {
       defaultSrc:      ["'self'"],
       scriptSrc:       ["'self'", "'unsafe-inline'"],
-      scriptSrcAttr:   ["'unsafe-inline'"],  // allow onclick="..." attributes in HTML
+      scriptSrcAttr:   ["'unsafe-inline'"],
       styleSrc:        ["'self'", "'unsafe-inline'"],
       connectSrc:      ["'self'", 'ws:', 'wss:'],
       imgSrc:          ["'self'", 'data:'],
       frameSrc:        ["'none'"],
       objectSrc:       ["'none'"],
+      // Do NOT include upgrade-insecure-requests — this app runs over plain
+      // HTTP on an internal network. That directive causes browsers to silently
+      // upgrade fetch/XHR calls to HTTPS, breaking all API requests.
+      upgradeInsecureRequests: null,
     },
   },
+  // Disable HSTS — sending this over HTTP causes browsers to block the site.
+  strictTransportSecurity: false,
   crossOriginEmbedderPolicy: false,
 }));
 
