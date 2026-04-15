@@ -140,6 +140,14 @@ db.exec(`
     user_agent   TEXT NOT NULL DEFAULT ''
   );
 
+  CREATE TABLE IF NOT EXISTS user_site_access (
+    user_id  INTEGER NOT NULL REFERENCES local_users(id) ON DELETE CASCADE,
+    site_id  INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, site_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_user_site_access_user ON user_site_access(user_id);
+
   CREATE TABLE IF NOT EXISTS audit_log (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
     ts       INTEGER NOT NULL DEFAULT (unixepoch()),
@@ -363,6 +371,29 @@ module.exports = {
 
   // Auto-fill battery_installed date from SNMP if the field is currently blank.
   // Only Tripp Lite NMC5 returns a last-replaced date via SNMP.
+  // Site access control
+  getUserSiteIds(userId) {
+    const rows = db.prepare('SELECT site_id FROM user_site_access WHERE user_id=?').all(userId);
+    return rows.map(r => r.site_id);
+  },
+  setUserSites(userId, siteIds) {
+    db.transaction(() => {
+      db.prepare('DELETE FROM user_site_access WHERE user_id=?').run(userId);
+      const ins = db.prepare('INSERT OR IGNORE INTO user_site_access (user_id,site_id) VALUES (?,?)');
+      for (const siteId of (siteIds || [])) ins.run(userId, siteId);
+    })();
+  },
+  // Returns null if user has no restriction (admin or all-access), or array of allowed site IDs
+  getAllowedSiteIds(userId, userType, roleId) {
+    // LDAP users and admins always get all sites
+    if (userType === 'ldap') return null;
+    const role = this.getRole(roleId);
+    if (role && role.can_manage_sites) return null; // site managers see all
+    const ids = this.getUserSiteIds(userId);
+    // If no explicit assignments, default to all sites (backward compat)
+    return ids.length > 0 ? ids : null;
+  },
+
   autoFillBatteryInstalled(deviceId, dateStr) {
     if (!dateStr) return;
     // Validate it looks like a date before writing (YYYY-MM-DD or similar)

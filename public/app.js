@@ -12,6 +12,7 @@ let state = {
   editSiteId: null,
   ws: null,
   wsOk: false,
+  allowedSiteIds: null,  // null = unrestricted, array = limited to these site IDs
 };
 
 async function apiFetch(path, opts = {}) {
@@ -253,6 +254,18 @@ function updateNavBadges() {
 }
 
 function renderOverview() {
+  // Show restricted access banner if user is limited to specific sites
+  const banner = document.getElementById('site-restriction-banner');
+  if (banner) {
+    if (state.allowedSiteIds) {
+      const names = state.sites.map(s => s.name).join(', ');
+      banner.style.display = '';
+      banner.textContent = `Restricted view: you have access to ${state.sites.length} site${state.sites.length !== 1 ? 's' : ''} (${names})`;
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+
   let green = 0, yellow = 0, red = 0;
   const attention = [];
   for (const d of state.devices) {
@@ -803,6 +816,8 @@ async function loadCurrentUser() {
   try {
     const data = await apiFetch('/auth/me');
     currentUser = data;
+    // Store allowed site IDs for client-side filtering (null = unrestricted)
+    state.allowedSiteIds = data.allowed_site_ids || null;
     renderUserBadge();
     applyPermissions();
   } catch (_) {
@@ -849,6 +864,13 @@ async function loadAdminData() {
   adminState.users     = users;
   adminState.groupMaps = groupMaps;
   adminState.sessions  = sessions;
+  // Load site assignments for all users
+  adminState.userSites = {};
+  await Promise.all(users.map(async u => {
+    try {
+      adminState.userSites[u.id] = await apiFetch(`/auth/users/${u.id}/sites`);
+    } catch (_) { adminState.userSites[u.id] = []; }
+  }));
   renderAdminPage();
 }
 
@@ -864,15 +886,29 @@ function renderUsersTable() {
   const tbody = document.getElementById('users-tbody');
   if (!tbody) return;
   if (!adminState.users.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No local users yet</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No local users yet</td></tr>';
     return;
   }
-  tbody.innerHTML = adminState.users.map(u => `
+  tbody.innerHTML = adminState.users.map(u => {
+    const role = adminState.roles.find(r => r.id === u.role_id);
+    const isAdmin = role?.can_manage_sites;
+    const siteIds = adminState.userSites?.[u.id];
+    let siteCell;
+    if (isAdmin) {
+      siteCell = '<span style="font-size:11px;color:var(--text3)">All sites</span>';
+    } else if (!siteIds || siteIds.length === 0) {
+      siteCell = '<span style="font-size:11px;color:var(--text3)">All sites</span>';
+    } else {
+      const names = siteIds.map(id => state.sites.find(s => s.id === id)?.name || id).join(', ');
+      siteCell = `<span style="font-size:11px;color:var(--blue-text)" title="${esc(names)}">${siteIds.length} site${siteIds.length !== 1 ? 's' : ''}</span>`;
+    }
+    return `
     <tr>
       <td style="font-weight:500">${esc(u.username)}</td>
       <td>${esc(u.display_name)}</td>
       <td>${esc(u.email||'—')}</td>
       <td>${pillHtml('blue', esc(u.role_name))}</td>
+      <td>${siteCell}</td>
       <td>${u.is_active ? pillHtml('green','Active') : pillHtml('gray','Disabled')}</td>
       <td style="font-size:11px;color:var(--text3)">${u.last_login ? fmtTs(u.last_login) : 'Never'}</td>
       <td>
@@ -881,7 +917,8 @@ function renderUsersTable() {
           <button class="sm danger" onclick="deleteUser(${u.id})">Delete</button>
         </div>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function renderRolesTable() {
@@ -964,6 +1001,7 @@ function openAddUser() {
   document.getElementById('mu-sess-ttl').value  = '8';
   document.getElementById('mu-password-row').style.display = '';
   populateRoleSelects();
+  renderSiteAccessCheckboxes([]);
   openModal('modal-user');
 }
 
@@ -983,7 +1021,45 @@ function openEditUser(id) {
   document.getElementById('mu-password-row').style.display = '';
   populateRoleSelects();
   document.getElementById('mu-role').value = u.role_id;
+  // Load existing site assignments
+  apiFetch(`/auth/users/${id}/sites`).then(siteIds => {
+    renderSiteAccessCheckboxes(siteIds || []);
+  }).catch(() => renderSiteAccessCheckboxes([]));
   openModal('modal-user');
+}
+
+function renderSiteAccessCheckboxes(checkedIds) {
+  const container = document.getElementById('mu-site-checkboxes');
+  const section   = document.getElementById('mu-site-access-section');
+  const hint      = document.getElementById('mu-site-access-hint');
+  if (!container) return;
+  // Check if user has can_manage_sites (admin-like) -- if so, hide the section
+  const roleId  = parseInt(document.getElementById('mu-role')?.value);
+  const role    = adminState.roles.find(r => r.id === roleId);
+  const isAdmin = role?.can_manage_sites;
+  if (isAdmin) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+  if (!state.sites.length) {
+    container.innerHTML = '<span style="font-size:12px;color:var(--text3)">No sites configured yet</span>';
+    return;
+  }
+  container.innerHTML = state.sites.map(s => `
+    <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:400;cursor:pointer;padding:3px 0">
+      <input type="checkbox" value="${s.id}" ${checkedIds.includes(s.id) ? 'checked' : ''}
+        style="width:auto;cursor:pointer">
+      ${esc(s.name)}${s.location ? `<span style="font-size:11px;color:var(--text3)">${esc(s.location)}</span>` : ''}
+    </label>`).join('');
+  hint.textContent = 'Check the sites this user can access. Leave all unchecked to grant access to all sites.';
+}
+
+function getSiteAccessIds() {
+  const container = document.getElementById('mu-site-checkboxes');
+  if (!container) return [];
+  return Array.from(container.querySelectorAll('input[type=checkbox]:checked'))
+    .map(cb => parseInt(cb.value));
 }
 
 async function saveUser() {
@@ -996,6 +1072,7 @@ async function saveUser() {
     is_active:     document.getElementById('mu-active').checked,
     session_type:  document.getElementById('mu-sess-type').value,
     session_ttl_h: parseInt(document.getElementById('mu-sess-ttl').value)||8,
+    site_ids:      getSiteAccessIds(),
   };
   if (!body.username && !adminState.editUserId) { toast('Username is required','error'); return; }
   if (!body.password && !adminState.editUserId) { toast('Password is required for new users','error'); return; }

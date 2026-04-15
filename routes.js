@@ -11,7 +11,17 @@ function err(res, msg, code=400) { res.status(code).json({ ok: false, error: msg
 
 router.get('/status', requireAuth, (req, res) => ok(res, { status: 'running', time: new Date().toISOString() }));
 
-router.get('/sites',      requireAuth,                  (req, res) => ok(res, db.getSites()));
+// Returns the list of site IDs this session is allowed to see, or null for unrestricted
+function getAllowedSites(session) {
+  if (session.user_type === 'ldap') return null;
+  return db.getAllowedSiteIds(session.user_id, session.user_type, session.role_id);
+}
+
+router.get('/sites', requireAuth, (req, res) => {
+  const allowed = getAllowedSites(req.session);
+  const sites = db.getSites();
+  ok(res, allowed ? sites.filter(s => allowed.includes(s.id)) : sites);
+});
 router.post('/sites',     requirePerm('can_manage_sites'), (req, res) => {
   const { name, location } = req.body;
   if (!name?.trim()) return err(res, 'name is required');
@@ -40,8 +50,27 @@ router.delete('/sites/:id', requirePerm('can_manage_sites'), (req, res) => {
   } catch (e) { err(res, e.message); }
 });
 
-router.get('/devices',      requireAuth,                    (req, res) => ok(res, db.getDevices(req.query.site_id||null)));
-router.get('/devices/:id',  requireAuth,                    (req, res) => { const d = db.getDevice(req.params.id); if (!d) return err(res, 'Not found', 404); ok(res, d); });
+router.get('/devices', requireAuth, (req, res) => {
+  const allowed = getAllowedSites(req.session);
+  const siteFilter = req.query.site_id || null;
+  // If restricted, only return devices from allowed sites
+  if (allowed) {
+    const effectiveSites = siteFilter
+      ? (allowed.includes(parseInt(siteFilter)) ? [parseInt(siteFilter)] : [])
+      : allowed;
+    const devices = effectiveSites.flatMap(sid => db.getDevices(sid));
+    return ok(res, devices);
+  }
+  ok(res, db.getDevices(siteFilter));
+});
+router.get('/devices/:id', requireAuth, (req, res) => {
+  const d = db.getDevice(req.params.id);
+  if (!d) return err(res, 'Not found', 404);
+  // Check site access
+  const allowed = getAllowedSites(req.session);
+  if (allowed && !allowed.includes(d.site_id)) return err(res, 'Not found', 404);
+  ok(res, d);
+});
 router.post('/devices',     requirePerm('can_edit_devices'), (req, res) => {
   const { site_id, name, ip } = req.body;
   if (!site_id || !name?.trim() || !ip?.trim()) return err(res, 'site_id, name and ip are required');

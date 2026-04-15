@@ -111,11 +111,16 @@ router.post('/logout', (req, res) => {
 
 router.get('/me', requireAuth, (req, res) => {
   const s = req.session;
+  // Get site restrictions for local users (null = unrestricted = sees all)
+  const allowedSiteIds = s.user_type === 'local'
+    ? db.getAllowedSiteIds(s.user_id, s.user_type, s.role_id)
+    : null;
   ok(res, {
-    username:     s.username,
-    display_name: s.display_name,
-    user_type:    s.user_type,
-    role_name:    s.role_name,
+    username:        s.username,
+    display_name:    s.display_name,
+    user_type:       s.user_type,
+    role_name:       s.role_name,
+    allowed_site_ids: allowedSiteIds,  // null = all sites, array = restricted
     permissions: {
       can_view:         !!s.can_view,
       can_edit_devices: !!s.can_edit_devices,
@@ -165,14 +170,19 @@ router.delete('/roles/:id', requirePerm('can_manage_users'), (req, res) => {
 
 router.get('/users', requirePerm('can_manage_users'), (req, res) => ok(res, db.getUsers()));
 
+router.get('/users/:id/sites', requirePerm('can_manage_users'), (req, res) => {
+  ok(res, db.getUserSiteIds(req.params.id));
+});
+
 router.post('/users', requirePerm('can_manage_users'), (req, res) => {
-  const { username, password, display_name, email, role_id, session_type, session_ttl_h } = req.body;
+  const { username, password, display_name, email, role_id, session_type, session_ttl_h, site_ids } = req.body;
   if (!username?.trim()) return err(res, 'Username required');
   if (!password || password.length < 8) return err(res, 'Password must be at least 8 characters');
   if (!role_id) return err(res, 'Role required');
   if (!db.getRole(role_id)) return err(res, 'Role not found', 404);
   try {
     const user = db.createUser({ username, password, display_name, email, role_id, session_type, session_ttl_h });
+    if (Array.isArray(site_ids)) db.setUserSites(user.id, site_ids);
     db.auditLog(req.session.username, req.ip, 'CREATE_USER', username, '', true);
     ok(res, user);
   } catch (e) {
@@ -184,11 +194,12 @@ router.post('/users', requirePerm('can_manage_users'), (req, res) => {
 router.put('/users/:id', requirePerm('can_manage_users'), (req, res) => {
   const user = db.getUser(req.params.id);
   if (!user) return err(res, 'User not found', 404);
-  const { display_name, email, role_id, is_active, session_type, session_ttl_h, password } = req.body;
+  const { display_name, email, role_id, is_active, session_type, session_ttl_h, password, site_ids } = req.body;
   if (role_id && !db.getRole(role_id)) return err(res, 'Role not found', 404);
   if (password && password.length < 8) return err(res, 'Password must be at least 8 characters');
   try {
     const updated = db.updateUser(req.params.id, { display_name, email, role_id: role_id||user.role_id, is_active, session_type, session_ttl_h, password });
+    if (Array.isArray(site_ids)) db.setUserSites(req.params.id, site_ids);
     if (password) db.deleteUserSessions(user.id, 'local');
     db.auditLog(req.session.username, req.ip, 'UPDATE_USER', user.username, '', true);
     ok(res, updated);

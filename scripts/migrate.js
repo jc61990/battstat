@@ -116,6 +116,17 @@ apply(8, 'set_snmp_version_auto_default', (db) => {
   db.prepare("UPDATE devices SET snmp_version='auto' WHERE snmp_version='v3'").run();
 });
 
+apply(9, 'add_user_site_access', (db) => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_site_access (
+      user_id  INTEGER NOT NULL REFERENCES local_users(id) ON DELETE CASCADE,
+      site_id  INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+      PRIMARY KEY (user_id, site_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_site_access_user ON user_site_access(user_id);
+  `);
+});
+
 // -- Summary -------------------------------------------------------------------
 const allMigrations = db.prepare('SELECT * FROM schema_migrations ORDER BY version').all();
 console.log(`\n[migrate] ${allMigrations.length} migration(s) recorded in schema_migrations.`);
