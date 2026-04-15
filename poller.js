@@ -83,7 +83,7 @@ const OID = {
 // Keyed on substrings of the SNMP model string (lowercase). First match wins.
 // Only fills in the part_number field if it is currently blank -- never overwrites.
 const BATTERY_PART_LOOKUP = [
-  // APC Smart-UPS SRT
+  // APC Smart-UPS SRT (Online)
   { match: 'srt1000',  part: 'APCRBC155' },
   { match: 'srt1500',  part: 'APCRBC155' },
   { match: 'srt2200',  part: 'APCRBC141' },
@@ -92,6 +92,13 @@ const BATTERY_PART_LOOKUP = [
   { match: 'srt6000',  part: 'APCRBC140' },
   { match: 'srt8000',  part: 'APCRBC140' },
   { match: 'srt10000', part: 'APCRBC140' },
+  // APC Smart-UPS (line-interactive, "Smart-UPS NNNN" model string from older NMC)
+  { match: 'smart-ups 750',  part: 'APCRBC123' },
+  { match: 'smart-ups 1000', part: 'APCRBC123' },
+  { match: 'smart-ups 1500', part: 'APCRBC115' },
+  { match: 'smart-ups 2200', part: 'APCRBC117' },
+  { match: 'smart-ups 3000', part: 'APCRBC117' },
+  { match: 'smart-ups 5000', part: 'APCRBC140' },
   // APC Smart-UPS SMT
   { match: 'smt750',   part: 'APCRBC123' },
   { match: 'smt1000',  part: 'APCRBC123' },
@@ -103,7 +110,7 @@ const BATTERY_PART_LOOKUP = [
   { match: 'smx1000',  part: 'APCRBC116' },
   { match: 'smx1500',  part: 'APCRBC116' },
   { match: 'smx2000',  part: 'APCRBC130' },
-  // APC Smart-UPS SUA/SURT
+  // APC Smart-UPS SUA/SURT (Online)
   { match: 'surt3000', part: 'APCRBC140' },
   { match: 'surt5000', part: 'APCRBC140' },
   { match: 'surt6000', part: 'APCRBC140' },
