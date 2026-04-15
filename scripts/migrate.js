@@ -96,6 +96,20 @@ apply(5, 'add_session_user_agent_index', (db) => {
   `);
 });
 
+apply(6, 'add_device_snmp_version', (db) => {
+  const cols = db.prepare('PRAGMA table_info(devices)').all();
+  if (!cols.find(c => c.name === 'snmp_version')) {
+    db.exec("ALTER TABLE devices ADD COLUMN snmp_version TEXT NOT NULL DEFAULT 'v3'");
+  }
+});
+
+apply(7, 'add_snmp_community', (db) => {
+  const cols = db.prepare('PRAGMA table_info(snmp_config)').all();
+  if (!cols.find(c => c.name === 'community')) {
+    db.exec("ALTER TABLE snmp_config ADD COLUMN community TEXT NOT NULL DEFAULT 'public'");
+  }
+});
+
 // -- Summary -------------------------------------------------------------------
 const allMigrations = db.prepare('SELECT * FROM schema_migrations ORDER BY version').all();
 console.log(`\n[migrate] ${allMigrations.length} migration(s) recorded in schema_migrations.`);

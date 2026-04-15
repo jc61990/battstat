@@ -346,18 +346,26 @@ function parseVarbinds(varbinds, vendor) {
 
 function pollDevice(device, cfg) {
   return new Promise((resolve) => {
-    const vendor = detectVendor(device);
-    const oids   = oidListForVendor(vendor);
-    const { sessionOpts, userOpts } = buildSnmpV3Options(cfg);
-
-    // NMC5/PADM20 requires an explicit empty context name to access UPS MIBs
-    if (vendor === 'tripplite') {
-      sessionOpts.context = '';
-    }
+    const vendor  = detectVendor(device);
+    const oids    = oidListForVendor(vendor);
+    const version = device.snmp_version || 'v3';
 
     let session;
     try {
-      session = snmp.createV3Session(device.ip, userOpts, sessionOpts);
+      if (version === 'v1' || version === 'v2c') {
+        const community = cfg.community || 'public';
+        const snmpVer   = version === 'v1' ? snmp.Version1 : snmp.Version2c;
+        session = snmp.createSession(device.ip, community, {
+          version:  snmpVer,
+          port:     cfg.port      || 161,
+          timeout:  cfg.timeout_ms || 5000,
+          retries:  cfg.retries   ?? 1,
+        });
+      } else {
+        const { sessionOpts, userOpts } = buildSnmpV3Options(cfg);
+        if (vendor === 'tripplite') sessionOpts.context = '';
+        session = snmp.createV3Session(device.ip, userOpts, sessionOpts);
+      }
     } catch (err) {
       resolve({ reachable: false, raw_error: err.message });
       return;

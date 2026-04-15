@@ -31,6 +31,7 @@ db.exec(`
     part_number       TEXT NOT NULL DEFAULT '',
     battery_installed TEXT NOT NULL DEFAULT '',
     notes             TEXT NOT NULL DEFAULT '',
+    snmp_version      TEXT NOT NULL DEFAULT 'v3',
     created_at        INTEGER NOT NULL DEFAULT (unixepoch()),
     updated_at        INTEGER NOT NULL DEFAULT (unixepoch())
   );
@@ -65,7 +66,8 @@ db.exec(`
     port            INTEGER NOT NULL DEFAULT 161,
     timeout_ms      INTEGER NOT NULL DEFAULT 5000,
     retries         INTEGER NOT NULL DEFAULT 1,
-    poll_interval_s INTEGER NOT NULL DEFAULT 60
+    poll_interval_s INTEGER NOT NULL DEFAULT 60,
+    community       TEXT NOT NULL DEFAULT 'public'
   );
 
   INSERT OR IGNORE INTO snmp_config (id) VALUES (1);
@@ -201,13 +203,13 @@ module.exports = {
     return db.prepare('SELECT d.*,s.name as site_name,s.location as site_location FROM devices d JOIN sites s ON d.site_id=s.id WHERE d.id=?').get(id);
   },
   createDevice(f) {
-    const r = db.prepare('INSERT INTO devices (site_id,name,ip,floor,serial,model,part_number,battery_installed,notes) VALUES (?,?,?,?,?,?,?,?,?)')
-      .run(f.site_id,f.name,f.ip,f.floor||'',f.serial||'',f.model||'',f.part_number||'',f.battery_installed||'',f.notes||'');
+    const r = db.prepare('INSERT INTO devices (site_id,name,ip,floor,serial,model,part_number,battery_installed,notes,snmp_version) VALUES (?,?,?,?,?,?,?,?,?,?)')
+      .run(f.site_id,f.name,f.ip,f.floor||'',f.serial||'',f.model||'',f.part_number||'',f.battery_installed||'',f.notes||'',f.snmp_version||'v3');
     return this.getDevice(r.lastInsertRowid);
   },
   updateDevice(id, f) {
-    db.prepare('UPDATE devices SET site_id=?,name=?,ip=?,floor=?,serial=?,model=?,part_number=?,battery_installed=?,notes=?,updated_at=unixepoch() WHERE id=?')
-      .run(f.site_id,f.name,f.ip,f.floor||'',f.serial||'',f.model||'',f.part_number||'',f.battery_installed||'',f.notes||'',id);
+    db.prepare('UPDATE devices SET site_id=?,name=?,ip=?,floor=?,serial=?,model=?,part_number=?,battery_installed=?,notes=?,snmp_version=?,updated_at=unixepoch() WHERE id=?')
+      .run(f.site_id,f.name,f.ip,f.floor||'',f.serial||'',f.model||'',f.part_number||'',f.battery_installed||'',f.notes||'',f.snmp_version||'v3',id);
     return this.getDevice(id);
   },
   deleteDevice(id) { return db.prepare('DELETE FROM devices WHERE id=?').run(id); },
@@ -231,8 +233,8 @@ module.exports = {
 
   getSnmpConfig() { return db.prepare('SELECT * FROM snmp_config WHERE id=1').get(); },
   saveSnmpConfig(cfg) {
-    db.prepare('UPDATE snmp_config SET security_name=?,auth_protocol=?,auth_key=?,priv_protocol=?,priv_key=?,security_level=?,port=?,timeout_ms=?,retries=?,poll_interval_s=? WHERE id=1')
-      .run(cfg.security_name||'',cfg.auth_protocol||'SHA',cfg.auth_key||'',cfg.priv_protocol||'AES',cfg.priv_key||'',cfg.security_level||'authPriv',cfg.port||161,cfg.timeout_ms||5000,cfg.retries??1,cfg.poll_interval_s||60);
+    db.prepare('UPDATE snmp_config SET security_name=?,auth_protocol=?,auth_key=?,priv_protocol=?,priv_key=?,security_level=?,port=?,timeout_ms=?,retries=?,poll_interval_s=?,community=? WHERE id=1')
+      .run(cfg.security_name||'',cfg.auth_protocol||'SHA',cfg.auth_key||'',cfg.priv_protocol||'AES',cfg.priv_key||'',cfg.security_level||'authPriv',cfg.port||161,cfg.timeout_ms||5000,cfg.retries??1,cfg.poll_interval_s||60,cfg.community||'public');
     return this.getSnmpConfig();
   },
 

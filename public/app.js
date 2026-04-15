@@ -577,6 +577,7 @@ function openAddDevice() {
   ['md-name','md-ip','md-floor','md-serial','md-model','md-part','md-batt-date','md-notes'].forEach(id => {
     document.getElementById(id).value = '';
   });
+  document.getElementById('md-snmp-version').value = 'v3';
   const sel = document.getElementById('md-site');
   sel.innerHTML = state.sites.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
   openModal('modal-device');
@@ -598,6 +599,7 @@ function openEditDevice(id) {
   document.getElementById('md-part').value = d.part_number;
   document.getElementById('md-batt-date').value = d.battery_installed || '';
   document.getElementById('md-notes').value = d.notes;
+  document.getElementById('md-snmp-version').value = d.snmp_version || 'v3';
   openModal('modal-device');
 }
 
@@ -612,6 +614,7 @@ async function saveDevice() {
     part_number: document.getElementById('md-part').value.trim(),
     battery_installed: document.getElementById('md-batt-date').value,
     notes: document.getElementById('md-notes').value.trim(),
+    snmp_version: document.getElementById('md-snmp-version').value || 'v3',
   };
   if (!body.name || !body.ip || !body.site_id) { toast('Name, IP, and site are required', 'error'); return; }
   try {
@@ -717,6 +720,7 @@ async function loadSnmpConfig() {
     document.getElementById('cfg-timeout').value = cfg.timeout_ms || 5000;
     document.getElementById('cfg-retries').value = cfg.retries ?? 1;
     document.getElementById('cfg-interval').value = cfg.poll_interval_s || 60;
+    document.getElementById('cfg-community').value = cfg.community || 'public';
   } catch (e) { toast('Failed to load config', 'error'); }
 }
 
@@ -732,6 +736,7 @@ async function saveSnmpConfig() {
     timeout_ms: parseInt(document.getElementById('cfg-timeout').value) || 5000,
     retries: parseInt(document.getElementById('cfg-retries').value) ?? 1,
     poll_interval_s: parseInt(document.getElementById('cfg-interval').value) || 60,
+    community: document.getElementById('cfg-community').value.trim() || 'public',
   };
   if (!body.security_name) { toast('Security name is required', 'error'); return; }
   try {
