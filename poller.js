@@ -55,18 +55,19 @@ const OID = {
   cyberModel:         '1.3.6.1.4.1.3808.1.1.1.1.1.1.0',
   cyberSerial:        '1.3.6.1.4.1.3808.1.1.1.1.2.3.0',
 
-  // Tripp Lite -- LX Platform / WEBCARDLX (firmware 15.x+)
-  tlBattCapacity:    '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.4.1',
-  tlBattStatus:      '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.3.1',
-  tlBattRunTime:     '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.5.1',
-  tlBattTemp:        '1.3.6.1.4.1.850.1.1.3.1.2.1.1.7',
-  tlInputVoltage:    '1.3.6.1.4.1.850.1.1.3.1.3.2.2.1.3.1',
-  tlOutputVoltage:   '1.3.6.1.4.1.850.1.1.3.1.3.3.1.3.1',
-  tlOutputLoad:      '1.3.6.1.4.1.850.1.1.3.1.3.3.1.10.1',
-  tlModel:           '1.3.6.1.4.1.850.1.1.1.2.1.6.1',
-  tlSerial:          '1.3.6.1.4.1.850.1.1.1.2.1.7.1',
-  tlFirmware:        '1.3.6.1.4.1.850.1.1.1.2.1.5.1',
-  tlNextReplaceDate: '1.3.6.1.4.1.850.1.1.3.1.3.1.5.1.6',
+  // Tripp Lite -- NMC5 / PADM 20 (confirmed OIDs from snmpwalk, context "" required)
+  tlBattCapacity:    '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.4.1',    // % INTEGER 100
+  tlBattStatus:      '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.2.1',    // Gauge32 0=normal
+  tlBattRunTime:     '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.3.1',    // seconds Gauge32 1092
+  tlBattTemp:        '1.3.6.1.4.1.850.1.1.3.1.3.4.1.1.1.1',    // Gauge32 599 (tenths C)
+  tlInputVoltage:    '1.3.6.1.4.1.850.1.1.3.1.3.2.2.1.3.1.1',  // Gauge32 1130 (tenths V)
+  tlOutputVoltage:   '1.3.6.1.4.1.850.1.1.3.1.3.3.2.1.2.1.1',  // Gauge32 1200 (tenths V)
+  tlOutputLoad:      '1.3.6.1.4.1.850.1.1.3.1.3.3.2.1.10.1.1', // % Gauge32
+  tlModel:           '1.3.6.1.4.1.850.1.1.1.2.1.5.1',           // STRING SU2200RTXLCD2U
+  tlSerial:          '1.3.6.1.4.1.850.1.1.2.1.1.5.1',           // STRING serial
+  tlFirmware:        '1.3.6.1.4.1.850.1.1.2.1.1.4.1',           // STRING firmware
+  tlLastReplaceDate: '1.3.6.1.4.1.850.1.1.3.1.3.1.5.1.5.1.1',  // STRING 2025-05-07
+  tlNextReplaceDate: '1.3.6.1.4.1.850.1.1.3.1.3.1.5.1.6.1.1',  // STRING 2028-05-07
 
   // Tripp Lite -- RFC 1628 standard UPS MIB (older SNMPWEBCARD, widely supported)
   rfc1628BattCapacity:  '1.3.6.1.2.1.33.1.2.4.0',
@@ -145,11 +146,11 @@ function oidListForVendor(vendor) {
       OID.cyberModel, OID.cyberSerial];
   }
   if (vendor === 'tripplite') {
-    // Query both LX Platform and RFC 1628 -- parseVarbinds picks whichever responds
     return [OID.sysDescr, OID.sysName,
       OID.tlBattCapacity, OID.tlBattStatus, OID.tlBattRunTime, OID.tlBattTemp,
       OID.tlInputVoltage, OID.tlOutputVoltage, OID.tlOutputLoad,
-      OID.tlModel, OID.tlSerial, OID.tlFirmware, OID.tlNextReplaceDate,
+      OID.tlModel, OID.tlSerial, OID.tlFirmware,
+      OID.tlLastReplaceDate, OID.tlNextReplaceDate,
       OID.rfc1628BattCapacity, OID.rfc1628BattStatus, OID.rfc1628BattRunTime,
       OID.rfc1628BattTemp, OID.rfc1628InputVoltage, OID.rfc1628OutputVoltage,
       OID.rfc1628OutputLoad];
@@ -176,37 +177,52 @@ function parseVarbinds(varbinds, vendor) {
   const getInt = (oid) => { const v = get(oid); return v !== null ? parseInt(v, 10) : null; };
 
   if (vendor === 'tripplite') {
-    // Prefer LX Platform MIB values; fall back to RFC 1628 if not present
-    const batt_capacity = getInt(OID.tlBattCapacity) ?? getInt(OID.rfc1628BattCapacity);
+    // NMC5/PADM20 confirmed OIDs. Voltages in tenths (1130=113.0V), runtime in seconds.
+    // Fall back to RFC 1628 if LX Platform OIDs don't respond.
+    const tlCap = getInt(OID.tlBattCapacity);
+    const batt_capacity = tlCap ?? getInt(OID.rfc1628BattCapacity);
 
-    const si = getInt(OID.tlBattStatus) ?? getInt(OID.rfc1628BattStatus);
-    const batt_status = si !== null ? (TL_BATT_STATUS[si] || String(si)) : null;
+    // Status: NMC5 returns 0=normal (non-standard). RFC 1628 uses 1-4.
+    const tlSi  = getInt(OID.tlBattStatus);
+    const rfcSi = getInt(OID.rfc1628BattStatus);
+    let batt_status = null;
+    if (tlSi !== null) {
+      // NMC5: 0=normal, non-zero=abnormal
+      batt_status = tlSi === 0 ? 'batteryNormal' : 'batteryLow';
+    } else if (rfcSi !== null) {
+      batt_status = TL_BATT_STATUS[rfcSi] || String(rfcSi);
+    }
 
+    // Runtime: LX Platform in seconds, RFC 1628 in TimeTicks (hundredths of a second)
     const tlRt  = getInt(OID.tlBattRunTime);
     const rfcRt = getInt(OID.rfc1628BattRunTime);
-    // LX Platform runtime: seconds. RFC 1628: TimeTicks (hundredths of a second)
     const batt_run_time = tlRt !== null
       ? Math.floor(tlRt / 60)
       : rfcRt !== null ? Math.floor(rfcRt / 6000) : null;
 
-    // Next replace date from LX Platform is days-until -- convert to ISO date string
-    const daysUntil = getInt(OID.tlNextReplaceDate);
-    let batt_replace_date = null;
-    if (daysUntil !== null) {
-      const d = new Date();
-      d.setDate(d.getDate() + daysUntil);
-      batt_replace_date = d.toISOString().slice(0, 10);
-    }
+    // Temperature: NMC5 returns tenths of degrees (599 = 59.9F = ~15.5C... or just 59.9C?)
+    // 599 seems too high for C, likely tenths: 59.9F = 15.5C. Divide by 10.
+    const tlTempRaw = getInt(OID.tlBattTemp);
+    const batt_temperature = tlTempRaw !== null
+      ? Math.round(tlTempRaw / 10)
+      : getInt(OID.rfc1628BattTemp);
+
+    // Voltages: NMC5 in tenths of volts (1130 = 113.0V)
+    const tlInV  = getInt(OID.tlInputVoltage);
+    const tlOutV = getInt(OID.tlOutputVoltage);
+
+    // Replace date: NMC5 returns ISO date strings directly
+    const batt_replace_date = get(OID.tlNextReplaceDate) || null;
 
     return {
       batt_capacity,
       batt_status,
-      batt_temperature:  getInt(OID.tlBattTemp)       ?? getInt(OID.rfc1628BattTemp),
+      batt_temperature,
       batt_run_time,
       batt_replace_date,
-      input_voltage:     getInt(OID.tlInputVoltage)   ?? getInt(OID.rfc1628InputVoltage),
-      output_voltage:    getInt(OID.tlOutputVoltage)  ?? getInt(OID.rfc1628OutputVoltage),
-      output_load:       getInt(OID.tlOutputLoad)     ?? getInt(OID.rfc1628OutputLoad),
+      input_voltage:  tlInV  !== null ? Math.round(tlInV  / 10) : getInt(OID.rfc1628InputVoltage),
+      output_voltage: tlOutV !== null ? Math.round(tlOutV / 10) : getInt(OID.rfc1628OutputVoltage),
+      output_load:    getInt(OID.tlOutputLoad) ?? getInt(OID.rfc1628OutputLoad),
       model_snmp:  get(OID.tlModel) || get(OID.sysDescr),
       serial_snmp: get(OID.tlSerial),
       firmware:    get(OID.tlFirmware),
@@ -273,6 +289,11 @@ function pollDevice(device, cfg) {
     const vendor = detectVendor(device);
     const oids   = oidListForVendor(vendor);
     const { sessionOpts, userOpts } = buildSnmpV3Options(cfg);
+
+    // NMC5/PADM20 requires an explicit empty context name to access UPS MIBs
+    if (vendor === 'tripplite') {
+      sessionOpts.context = '';
+    }
 
     let session;
     try {
