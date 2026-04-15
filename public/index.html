@@ -25,6 +25,24 @@
   --red-bg:#501313;--red-text:#f7c1c1;--red-border:#a32d2d;
   --blue:#378add;--blue-bg:#042c53;--blue-text:#b5d4f4;
 }}
+[data-theme="dark"]{
+  --bg:#1c1c1a;--bg2:#242422;--bg3:#2c2c2a;
+  --text:#e8e6de;--text2:#9c9a92;--text3:#6b6a65;
+  --border:rgba(255,255,255,0.1);--border2:rgba(255,255,255,0.18);
+  --green-bg:#173404;--green-text:#c0dd97;--green-border:#3b6d11;
+  --yellow-bg:#412402;--yellow-text:#fac775;--yellow-border:#854f0b;
+  --red-bg:#501313;--red-text:#f7c1c1;--red-border:#a32d2d;
+  --blue:#378add;--blue-bg:#042c53;--blue-text:#b5d4f4;
+}
+[data-theme="light"]{
+  --bg:#f8f8f6;--bg2:#ffffff;--bg3:#f1f0eb;
+  --text:#1a1a18;--text2:#6b6a65;--text3:#9c9a92;
+  --border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.18);
+  --green-bg:#eaf3de;--green-text:#3b6d11;--green-border:#97c459;
+  --yellow-bg:#faeeda;--yellow-text:#854f0b;--yellow-border:#ef9f27;
+  --red-bg:#fcebeb;--red-text:#a32d2d;--red-border:#f09595;
+  --blue:#185fa5;--blue-bg:#e6f1fb;--blue-text:#0c447c;
+}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
 a{color:var(--blue);text-decoration:none}
 button{font-family:inherit;font-size:13px;cursor:pointer;border-radius:var(--radius);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);padding:6px 14px;transition:background .12s,opacity .12s}
@@ -229,9 +247,12 @@ tr.clickable:hover td{background:var(--bg3)}
       </div>
     </nav>
     <div class="sidebar-footer">
-      <div style="margin-bottom:8px">
-        <span class="ws-dot" id="ws-dot"></span>
-        <span id="ws-status">Connecting…</span>
+      <div style="margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <span class="ws-dot" id="ws-dot"></span>
+          <span id="ws-status">Connecting…</span>
+        </div>
+        <button class="sm" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode" style="padding:3px 8px;font-size:12px;border-radius:6px">🌙</button>
       </div>
       <div class="user-badge" id="user-badge"></div>
     </div>
@@ -620,6 +641,35 @@ tr.clickable:hover td{background:var(--bg3)}
 </div>
 
 <div class="toast-wrap" id="toasts"></div>
+
+<script>
+// Theme toggle — runs before app.js to avoid flash
+(function() {
+  var saved = localStorage.getItem('battstat-theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+  }
+  window.toggleTheme = function() {
+    var current = document.documentElement.getAttribute('data-theme');
+    var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // Determine effective current theme
+    var isDark = current === 'dark' || (!current && sysDark);
+    var next = isDark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('battstat-theme', next);
+    var btn = document.getElementById('theme-toggle');
+    if (btn) btn.textContent = next === 'dark' ? '☀️' : '🌙';
+  };
+  // Set correct icon on load
+  window.addEventListener('DOMContentLoaded', function() {
+    var saved = localStorage.getItem('battstat-theme');
+    var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var isDark = saved === 'dark' || (!saved && sysDark);
+    var btn = document.getElementById('theme-toggle');
+    if (btn) btn.textContent = isDark ? '☀️' : '🌙';
+  });
+})();
+</script>
 
 <script src="app.js"></script>
 </body>

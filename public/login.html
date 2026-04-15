@@ -21,6 +21,20 @@
   --blue:#378add;--blue-bg:#042c53;
   --red-bg:#501313;--red-text:#f7c1c1;--red-border:#a32d2d;
 }}
+[data-theme="dark"]{
+  --bg:#1c1c1a;--bg2:#242422;--bg3:#2c2c2a;
+  --text:#e8e6de;--text2:#9c9a92;--text3:#6b6a65;
+  --border:rgba(255,255,255,0.1);--border2:rgba(255,255,255,0.18);
+  --blue:#378add;--blue-bg:#042c53;
+  --red-bg:#501313;--red-text:#f7c1c1;--red-border:#a32d2d;
+}
+[data-theme="light"]{
+  --bg:#f8f8f6;--bg2:#ffffff;--bg3:#f1f0eb;
+  --text:#1a1a18;--text2:#6b6a65;--text3:#9c9a92;
+  --border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.18);
+  --blue:#185fa5;--blue-bg:#e6f1fb;
+  --red-bg:#fcebeb;--red-text:#a32d2d;--red-border:#f09595;
+}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
 .card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:32px;width:100%;max-width:380px}
 .logo{display:flex;align-items:center;gap:10px;margin-bottom:24px}
@@ -125,7 +139,12 @@ function showError(msg) {
   document.getElementById('password').focus();
 }
 
-window.addEventListener('load', () => document.getElementById('username').focus());
+window.addEventListener('load', () => {
+  document.getElementById('username').focus();
+  // Apply saved theme preference
+  var saved = localStorage.getItem('battstat-theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+});
 </script>
 </body>
 </html>
