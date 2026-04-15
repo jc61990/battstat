@@ -1,7 +1,7 @@
 'use strict';
 
 const snmp = require('net-snmp');
-const { getDevices, getDevice, getSnmpConfig, savePollResult, pruneOldPolls } = require('./db');
+const { getDevices, getDevice, getSnmpConfig, savePollResult, pruneOldPolls, autoFillPartNumber } = require('./db');
 
 let pollTimer  = null;
 let wsClients  = new Set();
@@ -78,6 +78,57 @@ const OID = {
   rfc1628OutputVoltage: '1.3.6.1.2.1.33.1.4.4.1.2.1',
   rfc1628OutputLoad:    '1.3.6.1.2.1.33.1.4.4.1.5.1',
 };
+
+// ── Replacement battery part number lookup ────────────────────────────────────
+// Keyed on substrings of the SNMP model string (lowercase). First match wins.
+// Only fills in the part_number field if it is currently blank -- never overwrites.
+const BATTERY_PART_LOOKUP = [
+  // APC Smart-UPS SRT
+  { match: 'srt1000',  part: 'APCRBC155' },
+  { match: 'srt1500',  part: 'APCRBC155' },
+  { match: 'srt2200',  part: 'APCRBC141' },
+  { match: 'srt3000',  part: 'APCRBC140' },
+  { match: 'srt5000',  part: 'APCRBC140' },
+  { match: 'srt6000',  part: 'APCRBC140' },
+  { match: 'srt8000',  part: 'APCRBC140' },
+  { match: 'srt10000', part: 'APCRBC140' },
+  // APC Smart-UPS SMT
+  { match: 'smt750',   part: 'APCRBC123' },
+  { match: 'smt1000',  part: 'APCRBC123' },
+  { match: 'smt1500',  part: 'APCRBC115' },
+  { match: 'smt2200',  part: 'APCRBC117' },
+  { match: 'smt3000',  part: 'APCRBC117' },
+  // APC Smart-UPS SMX
+  { match: 'smx750',   part: 'APCRBC116' },
+  { match: 'smx1000',  part: 'APCRBC116' },
+  { match: 'smx1500',  part: 'APCRBC116' },
+  { match: 'smx2000',  part: 'APCRBC130' },
+  // APC Smart-UPS SUA/SURT
+  { match: 'surt3000', part: 'APCRBC140' },
+  { match: 'surt5000', part: 'APCRBC140' },
+  { match: 'surt6000', part: 'APCRBC140' },
+  // Tripp Lite SmartOnline
+  { match: 'su2200rtxlcd2u', part: 'RBC94-2U' },
+  { match: 'su1500rtxlcd2u', part: 'RBC59-2U' },
+  { match: 'su3000rtxlcd2u', part: 'RBC94-2U' },
+  { match: 'su750rt2u',      part: 'RBC25-2U' },
+  { match: 'su1000rt2u',     part: 'RBC93-2U' },
+  // Tripp Lite SmartPro
+  { match: 'smart2200rm2u',  part: 'RBC94-2U' },
+  { match: 'smart1500rm2u',  part: 'RBC93-2U' },
+  { match: 'smart3000rm2u',  part: 'RBC105-2U' },
+];
+
+function lookupPartNumber(modelSnmp) {
+  if (!modelSnmp) return null;
+  const lower = modelSnmp.toLowerCase().replace(/[\s-]/g, '');
+  for (const entry of BATTERY_PART_LOOKUP) {
+    if (lower.includes(entry.match.toLowerCase().replace(/[\s-]/g, ''))) {
+      return entry.part;
+    }
+  }
+  return null;
+}
 
 const APC_BATT_STATUS    = { 1:'unknown', 2:'batteryNormal', 3:'batteryLow', 4:'batteryInFaultCondition' };
 const CYBER_BATT_STATUS  = { 1:'unknown', 2:'batteryNormal', 3:'batteryLow', 4:'batteryDepleted' };
@@ -331,6 +382,10 @@ async function runPollCycle() {
     for (const device of devices) {
       const data = await pollDevice(device, cfg);
       savePollResult(device.id, data);
+      if (data.reachable && data.model_snmp) {
+        const part = lookupPartNumber(data.model_snmp);
+        if (part) autoFillPartNumber(device.id, part);
+      }
       results.push({ device_id: device.id, device_name: device.name, ...data });
     }
     broadcast('poll_complete', results);
@@ -364,6 +419,10 @@ function pollSingleDevice(deviceId) {
   if (!cfg || !cfg.security_name) return Promise.reject(new Error('SNMP not configured'));
   return pollDevice(device, cfg).then(data => {
     savePollResult(device.id, data);
+    if (data.reachable && data.model_snmp) {
+      const part = lookupPartNumber(data.model_snmp);
+      if (part) autoFillPartNumber(device.id, part);
+    }
     broadcast('poll_complete', [{ device_id: device.id, device_name: device.name, ...data }]);
     return data;
   });

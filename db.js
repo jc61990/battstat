@@ -336,6 +336,15 @@ module.exports = {
     return db.prepare('SELECT s.*,r.name as role_name FROM sessions s JOIN roles r ON s.role_id=r.id WHERE s.expires_at>unixepoch() ORDER BY s.last_seen DESC').all();
   },
 
+  // Auto-fill the part_number field if blank and we have a known model match.
+  // Called from the poller after each successful poll -- never overwrites existing values.
+  autoFillPartNumber(deviceId, partNumber) {
+    if (!partNumber) return;
+    db.prepare(
+      "UPDATE devices SET part_number=?, updated_at=unixepoch() WHERE id=? AND (part_number IS NULL OR part_number='')"
+    ).run(partNumber, deviceId);
+  },
+
   auditLog(username, ip, action, target, detail, success=true) {
     return db.prepare('INSERT INTO audit_log (username,ip,action,target,detail,success) VALUES (?,?,?,?,?,?)').run(username||'',ip||'',action,target||'',detail||'',success?1:0);
   },
