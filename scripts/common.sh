@@ -133,9 +133,16 @@ is_git_repo() {
 }
 
 get_git_version() {
+  # Try APP_DIR first, then fall back to wherever the script is running from
+  local repo=""
   if is_git_repo "$APP_DIR"; then
-    git -C "$APP_DIR" describe --tags --always 2>/dev/null \
-      || git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null \
+    repo="$APP_DIR"
+  elif [ -n "${SCRIPT_DIR:-}" ] && is_git_repo "$SCRIPT_DIR"; then
+    repo="$SCRIPT_DIR"
+  fi
+  if [ -n "$repo" ]; then
+    # Show short hash + first line of commit message, e.g. "abc1234 Fix CSP headers"
+    git -C "$repo" log -1 --format="%h %s" 2>/dev/null \
       || echo "unknown"
   else
     echo "unknown"

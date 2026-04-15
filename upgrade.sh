@@ -118,7 +118,7 @@ trap rollback ERR
 header "Step 1/6: Backup"
 if [ "$SKIP_BACKUP" -ne 1 ]; then
   BACKUP_PATH=$(backup_data "pre-upgrade")
-  prune_old_backups 2
+  prune_old_backups 5
 else
   warn "Skipping backup (--skip-backup passed)"
 fi
