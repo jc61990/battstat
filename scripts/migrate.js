@@ -99,7 +99,7 @@ apply(5, 'add_session_user_agent_index', (db) => {
 apply(6, 'add_device_snmp_version', (db) => {
   const cols = db.prepare('PRAGMA table_info(devices)').all();
   if (!cols.find(c => c.name === 'snmp_version')) {
-    db.exec("ALTER TABLE devices ADD COLUMN snmp_version TEXT NOT NULL DEFAULT 'v3'");
+    db.exec("ALTER TABLE devices ADD COLUMN snmp_version TEXT NOT NULL DEFAULT 'auto'");
   }
 });
 
@@ -108,6 +108,12 @@ apply(7, 'add_snmp_community', (db) => {
   if (!cols.find(c => c.name === 'community')) {
     db.exec("ALTER TABLE snmp_config ADD COLUMN community TEXT NOT NULL DEFAULT 'public'");
   }
+});
+
+apply(8, 'set_snmp_version_auto_default', (db) => {
+  // Migrate existing devices from old 'v3' default to 'auto' so they
+  // benefit from fallback detection. Devices explicitly set to v2c/v1 unchanged.
+  db.prepare("UPDATE devices SET snmp_version='auto' WHERE snmp_version='v3'").run();
 });
 
 // -- Summary -------------------------------------------------------------------

@@ -547,9 +547,10 @@ tr.clickable:hover td{background:var(--bg3)}
       <div class="form-row"><label>Battery installed date</label><input type="date" id="md-batt-date"></div>
       <div class="form-row"><label>SNMP version</label>
         <select id="md-snmp-version">
-          <option value="v3">SNMPv3 (default)</option>
-          <option value="v2c">SNMPv2c</option>
-          <option value="v1">SNMPv1</option>
+          <option value="auto">Auto-detect (try v3 → v2c → v1)</option>
+          <option value="v3">SNMPv3 only</option>
+          <option value="v2c">SNMPv2c only</option>
+          <option value="v1">SNMPv1 only</option>
         </select>
       </div>
     </div>

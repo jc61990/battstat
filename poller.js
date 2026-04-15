@@ -1,7 +1,7 @@
 'use strict';
 
 const snmp = require('net-snmp');
-const { getDevices, getDevice, getSnmpConfig, savePollResult, pruneOldPolls, autoFillPartNumber, autoFillBatteryInstalled } = require('./db');
+const { getDevices, getDevice, getSnmpConfig, savePollResult, pruneOldPolls, autoFillPartNumber, autoFillBatteryInstalled, setDiscoveredSnmpVersion } = require('./db');
 
 let pollTimer  = null;
 let wsClients  = new Set();
@@ -342,47 +342,97 @@ function parseVarbinds(varbinds, vendor) {
   };
 }
 
-// ── Poll a single device ──────────────────────────────────────────────────────
+// ── SNMP session factory ──────────────────────────────────────────────────────
 
-function pollDevice(device, cfg) {
+function createSnmpSession(device, cfg, version) {
+  const vendor = detectVendor(device);
+  if (version === 'v1' || version === 'v2c') {
+    const snmpVer = version === 'v1' ? snmp.Version1 : snmp.Version2c;
+    return snmp.createSession(device.ip, cfg.community || 'public', {
+      version:  snmpVer,
+      port:     cfg.port      || 161,
+      timeout:  cfg.timeout_ms || 5000,
+      retries:  cfg.retries   ?? 1,
+    });
+  }
+  // v3
+  const { sessionOpts, userOpts } = buildSnmpV3Options(cfg);
+  if (vendor === 'tripplite') sessionOpts.context = '';
+  return snmp.createV3Session(device.ip, userOpts, sessionOpts);
+}
+
+function trySnmpGet(device, cfg, oids, version) {
   return new Promise((resolve) => {
-    const vendor  = detectVendor(device);
-    const oids    = oidListForVendor(vendor);
-    const version = device.snmp_version || 'v3';
-
     let session;
     try {
-      if (version === 'v1' || version === 'v2c') {
-        const community = cfg.community || 'public';
-        const snmpVer   = version === 'v1' ? snmp.Version1 : snmp.Version2c;
-        session = snmp.createSession(device.ip, community, {
-          version:  snmpVer,
-          port:     cfg.port      || 161,
-          timeout:  cfg.timeout_ms || 5000,
-          retries:  cfg.retries   ?? 1,
-        });
-      } else {
-        const { sessionOpts, userOpts } = buildSnmpV3Options(cfg);
-        if (vendor === 'tripplite') sessionOpts.context = '';
-        session = snmp.createV3Session(device.ip, userOpts, sessionOpts);
-      }
+      session = createSnmpSession(device, cfg, version);
     } catch (err) {
-      resolve({ reachable: false, raw_error: err.message });
+      resolve({ ok: false, error: err.message });
       return;
     }
-
     const cleanup = () => { try { session.close(); } catch (_) {} };
-
     session.get(oids, (err, varbinds) => {
       cleanup();
-      if (err) { resolve({ reachable: false, raw_error: err.message }); return; }
-      try {
-        resolve({ reachable: true, ...parseVarbinds(varbinds, vendor) });
-      } catch (parseErr) {
-        resolve({ reachable: false, raw_error: 'Parse error: ' + parseErr.message });
-      }
+      if (err) { resolve({ ok: false, error: err.message }); return; }
+      resolve({ ok: true, varbinds });
     });
   });
+}
+
+// ── Poll a single device ──────────────────────────────────────────────────────
+
+async function pollDevice(device, cfg) {
+  const vendor  = detectVendor(device);
+  const oids    = oidListForVendor(vendor);
+  const setting = device.snmp_version || 'auto';
+
+  // Build list of versions to try in order
+  let versions;
+  if (setting === 'auto') {
+    versions = ['v3', 'v2c', 'v1'];
+  } else {
+    versions = [setting];
+  }
+
+  for (const version of versions) {
+    const result = await trySnmpGet(device, cfg, oids, version);
+
+    if (result.ok) {
+      // Success -- if we were in auto mode, save the discovered version
+      if (setting === 'auto' && version !== 'v3') {
+        // Only persist non-v3 discoveries to avoid re-trying on every poll
+        setDiscoveredSnmpVersion(device.id, version);
+        console.log(`[poller] ${device.name}: discovered SNMP ${version}, saved for future polls`);
+      }
+      try {
+        return { reachable: true, ...parseVarbinds(result.varbinds, vendor) };
+      } catch (parseErr) {
+        return { reachable: false, raw_error: 'Parse error: ' + parseErr.message };
+      }
+    }
+
+    // If the error is a timeout/unreachable on the last version, give up
+    const isTimeout = result.error && (
+      result.error.includes('Timed out') ||
+      result.error.includes('timeout') ||
+      result.error.includes('unreachable')
+    );
+
+    if (setting !== 'auto' || version === versions[versions.length - 1]) {
+      return { reachable: false, raw_error: result.error };
+    }
+
+    // Auth/access errors on v3 are worth falling back from
+    // Pure timeouts on v3 might mean device doesn't exist -- skip remaining versions
+    if (isTimeout) {
+      return { reachable: false, raw_error: result.error };
+    }
+
+    // Otherwise try next version
+    console.log(`[poller] ${device.name}: SNMP ${version} failed (${result.error}), trying fallback...`);
+  }
+
+  return { reachable: false, raw_error: 'All SNMP versions failed' };
 }
 
 // ── Poll cycle ────────────────────────────────────────────────────────────────

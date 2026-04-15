@@ -31,7 +31,7 @@ db.exec(`
     part_number       TEXT NOT NULL DEFAULT '',
     battery_installed TEXT NOT NULL DEFAULT '',
     notes             TEXT NOT NULL DEFAULT '',
-    snmp_version      TEXT NOT NULL DEFAULT 'v3',
+    snmp_version      TEXT NOT NULL DEFAULT 'auto',
     created_at        INTEGER NOT NULL DEFAULT (unixepoch()),
     updated_at        INTEGER NOT NULL DEFAULT (unixepoch())
   );
@@ -204,12 +204,12 @@ module.exports = {
   },
   createDevice(f) {
     const r = db.prepare('INSERT INTO devices (site_id,name,ip,floor,serial,model,part_number,battery_installed,notes,snmp_version) VALUES (?,?,?,?,?,?,?,?,?,?)')
-      .run(f.site_id,f.name,f.ip,f.floor||'',f.serial||'',f.model||'',f.part_number||'',f.battery_installed||'',f.notes||'',f.snmp_version||'v3');
+      .run(f.site_id,f.name,f.ip,f.floor||'',f.serial||'',f.model||'',f.part_number||'',f.battery_installed||'',f.notes||'',f.snmp_version||'auto');
     return this.getDevice(r.lastInsertRowid);
   },
   updateDevice(id, f) {
     db.prepare('UPDATE devices SET site_id=?,name=?,ip=?,floor=?,serial=?,model=?,part_number=?,battery_installed=?,notes=?,snmp_version=?,updated_at=unixepoch() WHERE id=?')
-      .run(f.site_id,f.name,f.ip,f.floor||'',f.serial||'',f.model||'',f.part_number||'',f.battery_installed||'',f.notes||'',f.snmp_version||'v3',id);
+      .run(f.site_id,f.name,f.ip,f.floor||'',f.serial||'',f.model||'',f.part_number||'',f.battery_installed||'',f.notes||'',f.snmp_version||'auto',id);
     return this.getDevice(id);
   },
   deleteDevice(id) { return db.prepare('DELETE FROM devices WHERE id=?').run(id); },
@@ -336,6 +336,20 @@ module.exports = {
   pruneExpiredSessions() { return db.prepare('DELETE FROM sessions WHERE expires_at<=unixepoch()').run(); },
   getActiveSessions() {
     return db.prepare('SELECT s.*,r.name as role_name FROM sessions s JOIN roles r ON s.role_id=r.id WHERE s.expires_at>unixepoch() ORDER BY s.last_seen DESC').all();
+  },
+
+  // Called by poller when auto-detection finds a working SNMP version.
+  // Stores the discovered version so future polls skip the fallback sequence.
+  // Only updates if device is currently set to 'auto' -- never overwrites a manual choice.
+  setDiscoveredSnmpVersion(deviceId, version) {
+    db.prepare("UPDATE devices SET snmp_version=? WHERE id=? AND snmp_version='auto'")
+      .run(version, deviceId);
+  },
+
+  // Reset a device back to auto-detect (called if device stops responding).
+  resetSnmpVersionToAuto(deviceId) {
+    db.prepare("UPDATE devices SET snmp_version='auto' WHERE id=? AND snmp_version NOT IN ('v3','v2c','v1')")
+      .run(deviceId);
   },
 
   // Auto-fill the part_number field if blank and we have a known model match.
