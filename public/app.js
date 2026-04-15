@@ -1001,6 +1001,9 @@ function openAddUser() {
   document.getElementById('mu-sess-ttl').value  = '8';
   document.getElementById('mu-password-row').style.display = '';
   populateRoleSelects();
+  // Default to Viewer role if available so site section is visible
+  const viewer = adminState.roles.find(r => r.name === 'Viewer');
+  if (viewer) document.getElementById('mu-role').value = viewer.id;
   renderSiteAccessCheckboxes([]);
   openModal('modal-user');
 }
@@ -1032,27 +1035,33 @@ function renderSiteAccessCheckboxes(checkedIds) {
   const container = document.getElementById('mu-site-checkboxes');
   const section   = document.getElementById('mu-site-access-section');
   const hint      = document.getElementById('mu-site-access-hint');
-  if (!container) return;
-  // Check if user has can_manage_sites (admin-like) -- if so, hide the section
+  if (!container || !section) return;
+
+  // Check if the selected role is an admin-type (can_manage_sites)
   const roleId  = parseInt(document.getElementById('mu-role')?.value);
   const role    = adminState.roles.find(r => r.id === roleId);
   const isAdmin = role?.can_manage_sites;
+
+  section.style.display = '';
+
   if (isAdmin) {
-    section.style.display = 'none';
+    container.innerHTML = '<span style="font-size:12px;color:var(--text3)">Admins with site management permission always see all sites.</span>';
+    if (hint) hint.textContent = '';
     return;
   }
-  section.style.display = '';
+
   if (!state.sites.length) {
     container.innerHTML = '<span style="font-size:12px;color:var(--text3)">No sites configured yet</span>';
     return;
   }
+
   container.innerHTML = state.sites.map(s => `
-    <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:400;cursor:pointer;padding:3px 0">
+    <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:400;cursor:pointer;padding:4px 0">
       <input type="checkbox" value="${s.id}" ${checkedIds.includes(s.id) ? 'checked' : ''}
         style="width:auto;cursor:pointer">
-      ${esc(s.name)}${s.location ? `<span style="font-size:11px;color:var(--text3)">${esc(s.location)}</span>` : ''}
+      <span>${esc(s.name)}</span>${s.location ? `<span style="font-size:11px;color:var(--text3);margin-left:4px">${esc(s.location)}</span>` : ''}
     </label>`).join('');
-  hint.textContent = 'Check the sites this user can access. Leave all unchecked to grant access to all sites.';
+  if (hint) hint.textContent = 'Check the sites this user can access. Leave all unchecked to grant access to all sites.';
 }
 
 function getSiteAccessIds() {
