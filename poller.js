@@ -398,9 +398,8 @@ async function pollDevice(device, cfg) {
     const result = await trySnmpGet(device, cfg, oids, version);
 
     if (result.ok) {
-      // Success -- if we were in auto mode, save the discovered version
+      // Success -- if we were in auto mode and had to fall back, save the discovered version
       if (setting === 'auto' && version !== 'v3') {
-        // Only persist non-v3 discoveries to avoid re-trying on every poll
         setDiscoveredSnmpVersion(device.id, version);
         console.log(`[poller] ${device.name}: discovered SNMP ${version}, saved for future polls`);
       }
@@ -411,25 +410,25 @@ async function pollDevice(device, cfg) {
       }
     }
 
-    // If the error is a timeout/unreachable on the last version, give up
-    const isTimeout = result.error && (
-      result.error.includes('Timed out') ||
-      result.error.includes('timeout') ||
-      result.error.includes('unreachable')
+    // Only fall back on authentication/access errors.
+    // Timeouts mean the device is unreachable -- no point trying other versions.
+    const isAuthError = result.error && (
+      result.error.includes('Wrong Digest') ||
+      result.error.includes('Unknown User Name') ||
+      result.error.includes('Unknown Security Name') ||
+      result.error.includes('Authorization Error') ||
+      result.error.includes('Authentication')
     );
 
-    if (setting !== 'auto' || version === versions[versions.length - 1]) {
+    const isLastVersion = version === versions[versions.length - 1];
+
+    if (isLastVersion || !isAuthError) {
+      // Timeout or last fallback -- give up
       return { reachable: false, raw_error: result.error };
     }
 
-    // Auth/access errors on v3 are worth falling back from
-    // Pure timeouts on v3 might mean device doesn't exist -- skip remaining versions
-    if (isTimeout) {
-      return { reachable: false, raw_error: result.error };
-    }
-
-    // Otherwise try next version
-    console.log(`[poller] ${device.name}: SNMP ${version} failed (${result.error}), trying fallback...`);
+    // Auth error on v3 -- worth trying v2c/v1 since credentials differ
+    console.log(`[poller] ${device.name}: SNMP ${version} auth failed, trying fallback...`);
   }
 
   return { reachable: false, raw_error: 'All SNMP versions failed' };

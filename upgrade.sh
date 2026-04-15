@@ -118,15 +118,7 @@ trap rollback ERR
 header "Step 1/6: Backup"
 if [ "$SKIP_BACKUP" -ne 1 ]; then
   BACKUP_PATH=$(backup_data "pre-upgrade")
-  # Keep only the 2 most recent backups -- delete everything older
-  if [ -d "$BACKUP_DIR" ]; then
-    BACKUP_COUNT=$(ls -1d "${BACKUP_DIR}"/[0-9]* 2>/dev/null | wc -l)
-    if [ "$BACKUP_COUNT" -gt 2 ]; then
-      info "Pruning old backups (keeping 2 most recent)..."
-      ls -1dt "${BACKUP_DIR}"/[0-9]* 2>/dev/null | tail -n +3 | xargs rm -rf
-      success "Old backups removed (kept $( ls -1d "${BACKUP_DIR}"/[0-9]* 2>/dev/null | wc -l ))"
-    fi
-  fi
+  prune_old_backups 2
 else
   warn "Skipping backup (--skip-backup passed)"
 fi

@@ -255,6 +255,30 @@ list_backups() {
   fi
 }
 
+# Keep only the most recent N backups, delete the rest.
+prune_old_backups() {
+  local keep="${1:-2}"
+  [ -d "$BACKUP_DIR" ] || return
+  # List subdirectories sorted oldest-first, skip the final-uninstall dir
+  local all_backups
+  all_backups=$(find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d \
+    ! -name 'final_uninstall' | sort)
+  local total
+  total=$(echo "$all_backups" | grep -c . 2>/dev/null || echo 0)
+  if [ "$total" -le "$keep" ]; then
+    return
+  fi
+  local to_delete
+  to_delete=$(echo "$all_backups" | head -n $(( total - keep )))
+  local count=0
+  while IFS= read -r dir; do
+    [ -z "$dir" ] && continue
+    rm -rf "$dir"
+    count=$(( count + 1 ))
+  done <<< "$to_delete"
+  [ "$count" -gt 0 ] && info "Pruned ${count} old backup(s), kept ${keep} most recent"
+}
+
 # -- Post-install summary ------------------------------------------------------
 print_dashboard_url() {
   local ip
