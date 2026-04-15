@@ -345,6 +345,17 @@ module.exports = {
     ).run(partNumber, deviceId);
   },
 
+  // Auto-fill battery_installed date from SNMP if the field is currently blank.
+  // Only Tripp Lite NMC5 returns a last-replaced date via SNMP.
+  autoFillBatteryInstalled(deviceId, dateStr) {
+    if (!dateStr) return;
+    // Validate it looks like a date before writing (YYYY-MM-DD or similar)
+    if (!/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return;
+    db.prepare(
+      "UPDATE devices SET battery_installed=?, updated_at=unixepoch() WHERE id=? AND (battery_installed IS NULL OR battery_installed='')"
+    ).run(dateStr, deviceId);
+  },
+
   auditLog(username, ip, action, target, detail, success=true) {
     return db.prepare('INSERT INTO audit_log (username,ip,action,target,detail,success) VALUES (?,?,?,?,?,?)').run(username||'',ip||'',action,target||'',detail||'',success?1:0);
   },

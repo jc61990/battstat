@@ -1,7 +1,7 @@
 'use strict';
 
 const snmp = require('net-snmp');
-const { getDevices, getDevice, getSnmpConfig, savePollResult, pruneOldPolls, autoFillPartNumber } = require('./db');
+const { getDevices, getDevice, getSnmpConfig, savePollResult, pruneOldPolls, autoFillPartNumber, autoFillBatteryInstalled } = require('./db');
 
 let pollTimer  = null;
 let wsClients  = new Set();
@@ -284,6 +284,8 @@ function parseVarbinds(varbinds, vendor) {
       model_snmp:  get(OID.tlModel) || get(OID.sysDescr),
       serial_snmp: get(OID.tlSerial),
       firmware:    get(OID.tlFirmware),
+      // Not saved to poll_results -- used by poller to auto-fill device.battery_installed
+      battery_installed_snmp: get(OID.tlLastReplaceDate) || null,
     };
   }
 
@@ -393,6 +395,9 @@ async function runPollCycle() {
         const part = lookupPartNumber(data.model_snmp);
         if (part) autoFillPartNumber(device.id, part);
       }
+      if (data.reachable && data.battery_installed_snmp) {
+        autoFillBatteryInstalled(device.id, data.battery_installed_snmp);
+      }
       results.push({ device_id: device.id, device_name: device.name, ...data });
     }
     broadcast('poll_complete', results);
@@ -429,6 +434,9 @@ function pollSingleDevice(deviceId) {
     if (data.reachable && data.model_snmp) {
       const part = lookupPartNumber(data.model_snmp);
       if (part) autoFillPartNumber(device.id, part);
+    }
+    if (data.reachable && data.battery_installed_snmp) {
+      autoFillBatteryInstalled(device.id, data.battery_installed_snmp);
     }
     broadcast('poll_complete', [{ device_id: device.id, device_name: device.name, ...data }]);
     return data;
