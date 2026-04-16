@@ -13,7 +13,6 @@ router.get('/status', requireAuth, (req, res) => ok(res, { status: 'running', ti
 
 // Returns the list of site IDs this session is allowed to see, or null for unrestricted
 function getAllowedSites(session) {
-  if (session.user_type === 'ldap') return null;
   return db.getAllowedSiteIds(session.user_id, session.user_type, session.role_id);
 }
 
