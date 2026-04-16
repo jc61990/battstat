@@ -135,10 +135,11 @@ router.get('/me', requireAuth, (req, res) => {
 router.get('/roles', requireAuth, (req, res) => ok(res, db.getRoles()));
 
 router.post('/roles', requirePerm('can_manage_users'), (req, res) => {
-  const { name, description, can_view, can_edit_devices, can_manage_sites, can_manage_users, can_manage_snmp, can_poll } = req.body;
+  const { name, description, can_view, can_edit_devices, can_manage_sites, can_manage_users, can_manage_snmp, can_poll, site_ids } = req.body;
   if (!name?.trim()) return err(res, 'Role name required');
   try {
     const role = db.createRole({ name: name.trim(), description, can_view, can_edit_devices, can_manage_sites, can_manage_users, can_manage_snmp, can_poll });
+    if (Array.isArray(site_ids)) db.setRoleSites(role.id, site_ids);
     db.auditLog(req.session.username, req.ip, 'CREATE_ROLE', 'roles', name, true);
     ok(res, role);
   } catch (e) {
@@ -153,6 +154,7 @@ router.put('/roles/:id', requirePerm('can_manage_users'), (req, res) => {
   if (role.is_system) return err(res, 'Cannot edit system roles');
   try {
     const updated = db.updateRole(req.params.id, req.body);
+    if (Array.isArray(req.body.site_ids)) db.setRoleSites(req.params.id, req.body.site_ids);
     db.auditLog(req.session.username, req.ip, 'UPDATE_ROLE', role.name, '', true);
     ok(res, updated);
   } catch (e) { err(res, e.message); }
@@ -170,19 +172,18 @@ router.delete('/roles/:id', requirePerm('can_manage_users'), (req, res) => {
 
 router.get('/users', requirePerm('can_manage_users'), (req, res) => ok(res, db.getUsers()));
 
-router.get('/users/:id/sites', requirePerm('can_manage_users'), (req, res) => {
-  ok(res, db.getUserSiteIds(req.params.id));
+router.get('/roles/:id/sites', requirePerm('can_manage_users'), (req, res) => {
+  ok(res, db.getRoleSiteIds(req.params.id));
 });
 
 router.post('/users', requirePerm('can_manage_users'), (req, res) => {
-  const { username, password, display_name, email, role_id, session_type, session_ttl_h, site_ids } = req.body;
+  const { username, password, display_name, email, role_id, session_type, session_ttl_h } = req.body;
   if (!username?.trim()) return err(res, 'Username required');
   if (!password || password.length < 8) return err(res, 'Password must be at least 8 characters');
   if (!role_id) return err(res, 'Role required');
   if (!db.getRole(role_id)) return err(res, 'Role not found', 404);
   try {
     const user = db.createUser({ username, password, display_name, email, role_id, session_type, session_ttl_h });
-    if (Array.isArray(site_ids)) db.setUserSites(user.id, site_ids);
     db.auditLog(req.session.username, req.ip, 'CREATE_USER', username, '', true);
     ok(res, user);
   } catch (e) {
@@ -194,12 +195,11 @@ router.post('/users', requirePerm('can_manage_users'), (req, res) => {
 router.put('/users/:id', requirePerm('can_manage_users'), (req, res) => {
   const user = db.getUser(req.params.id);
   if (!user) return err(res, 'User not found', 404);
-  const { display_name, email, role_id, is_active, session_type, session_ttl_h, password, site_ids } = req.body;
+  const { display_name, email, role_id, is_active, session_type, session_ttl_h, password } = req.body;
   if (role_id && !db.getRole(role_id)) return err(res, 'Role not found', 404);
   if (password && password.length < 8) return err(res, 'Password must be at least 8 characters');
   try {
     const updated = db.updateUser(req.params.id, { display_name, email, role_id: role_id||user.role_id, is_active, session_type, session_ttl_h, password });
-    if (Array.isArray(site_ids)) db.setUserSites(req.params.id, site_ids);
     if (password) db.deleteUserSessions(user.id, 'local');
     db.auditLog(req.session.username, req.ip, 'UPDATE_USER', user.username, '', true);
     ok(res, updated);

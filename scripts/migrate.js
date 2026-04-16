@@ -127,6 +127,24 @@ apply(9, 'add_user_site_access', (db) => {
   `);
 });
 
+apply(10, 'add_site_role_access', (db) => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS site_role_access (
+      role_id  INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+      site_id  INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+      PRIMARY KEY (role_id, site_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_site_role_access_role ON site_role_access(role_id);
+  `);
+  // Migrate any existing user_site_access entries to role-based access.
+  // For each user that had explicit site access, apply it to their role instead.
+  // This is best-effort -- if multiple users have different sites on the same role,
+  // the role gets the union of all their sites.
+  const userSites = db.prepare('SELECT u.role_id, usa.site_id FROM user_site_access usa JOIN local_users u ON usa.user_id=u.id').all();
+  const ins = db.prepare('INSERT OR IGNORE INTO site_role_access (role_id,site_id) VALUES (?,?)');
+  for (const row of userSites) ins.run(row.role_id, row.site_id);
+});
+
 // -- Summary -------------------------------------------------------------------
 const allMigrations = db.prepare('SELECT * FROM schema_migrations ORDER BY version').all();
 console.log(`\n[migrate] ${allMigrations.length} migration(s) recorded in schema_migrations.`);

@@ -406,7 +406,7 @@ tr.clickable:hover td{background:var(--bg3)}
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Username</th><th>Display name</th><th>Email</th><th>Role</th><th>Site access</th><th>Status</th><th>Last login</th><th></th></tr></thead>
+            <thead><tr><th>Username</th><th>Display name</th><th>Email</th><th>Role</th><th>Status</th><th>Last login</th><th></th></tr></thead>
             <tbody id="users-tbody"></tbody>
           </table>
         </div>
@@ -419,7 +419,7 @@ tr.clickable:hover td{background:var(--bg3)}
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Role name</th><th>Description</th><th>Permissions</th><th></th></tr></thead>
+            <thead><tr><th>Role name</th><th>Description</th><th>Permissions</th><th>Site access</th><th></th></tr></thead>
             <tbody id="roles-tbody"></tbody>
           </table>
         </div>
@@ -584,7 +584,7 @@ tr.clickable:hover td{background:var(--bg3)}
       <div class="form-row"><label>Username *</label><input type="text" id="mu-username" placeholder="jsmith" autocomplete="off"></div>
       <div class="form-row"><label>Display name</label><input type="text" id="mu-display" placeholder="John Smith"></div>
       <div class="form-row"><label>Email</label><input type="email" id="mu-email" placeholder="jsmith@company.com"></div>
-      <div class="form-row"><label>Role *</label><select id="mu-role" onchange="renderSiteAccessCheckboxes(getSiteAccessIds())"></select></div>
+      <div class="form-row"><label>Role *</label><select id="mu-role"></select></div>
       <div class="form-row" id="mu-password-row"><label>Password</label><input type="password" id="mu-password" placeholder="min 8 characters" autocomplete="new-password"></div>
       <div class="form-row"><label>Session type</label><select id="mu-sess-type"><option value="session">Session only (expires on close)</option><option value="persistent">Persistent (stays logged in)</option></select></div>
       <div class="form-row"><label>Session duration (hours)</label><input type="number" id="mu-sess-ttl" value="8" min="1" max="720"></div>
@@ -592,13 +592,6 @@ tr.clickable:hover td{background:var(--bg3)}
         <input type="checkbox" id="mu-active" checked>
         <label for="mu-active" style="margin:0;font-size:13px;font-weight:400;cursor:pointer">Account active</label>
       </div>
-    </div>
-    <div id="mu-site-access-section" style="margin-top:14px;border-top:0.5px solid var(--border);padding-top:14px">
-      <label style="display:block;margin-bottom:6px">Site access</label>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:8px" id="mu-site-access-hint">
-        Select which sites this user can see. Leave all unchecked to grant access to all sites.
-      </div>
-      <div id="mu-site-checkboxes" style="display:flex;flex-direction:column;gap:5px;max-height:180px;overflow-y:auto;padding:2px"></div>
     </div>
     <div class="form-actions">
       <button onclick="closeModal('modal-user')">Cancel</button>
@@ -618,11 +611,18 @@ tr.clickable:hover td{background:var(--bg3)}
       <div class="perm-grid">
         <label class="perm-row"><input type="checkbox" id="mr-view" checked> View dashboard</label>
         <label class="perm-row"><input type="checkbox" id="mr-edit-dev"> Add / edit devices</label>
-        <label class="perm-row"><input type="checkbox" id="mr-manage-sites"> Manage sites</label>
+        <label class="perm-row"><input type="checkbox" id="mr-manage-sites" onchange="renderRoleSiteCheckboxes(getRoleSiteIds())"> Manage sites</label>
         <label class="perm-row"><input type="checkbox" id="mr-manage-users"> Manage users &amp; roles</label>
         <label class="perm-row"><input type="checkbox" id="mr-manage-snmp"> Edit SNMP settings</label>
         <label class="perm-row"><input type="checkbox" id="mr-poll"> Trigger manual polls</label>
       </div>
+    </div>
+    <div id="mr-site-access-section" style="margin-top:14px;border-top:0.5px solid var(--border);padding-top:14px">
+      <label style="display:block;margin-bottom:6px">Site access</label>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px" id="mr-site-access-hint">
+        Restrict this role to specific sites. Leave all unchecked to grant access to all sites.
+      </div>
+      <div id="mr-site-checkboxes" style="display:flex;flex-direction:column;gap:5px;max-height:180px;overflow-y:auto;padding:2px"></div>
     </div>
     <div class="form-actions">
       <button onclick="closeModal('modal-role')">Cancel</button>

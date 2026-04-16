@@ -140,6 +140,14 @@ db.exec(`
     user_agent   TEXT NOT NULL DEFAULT ''
   );
 
+  CREATE TABLE IF NOT EXISTS site_role_access (
+    role_id  INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    site_id  INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    PRIMARY KEY (role_id, site_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_site_role_access_role ON site_role_access(role_id);
+
   CREATE TABLE IF NOT EXISTS user_site_access (
     user_id  INTEGER NOT NULL REFERENCES local_users(id) ON DELETE CASCADE,
     site_id  INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
@@ -371,26 +379,25 @@ module.exports = {
 
   // Auto-fill battery_installed date from SNMP if the field is currently blank.
   // Only Tripp Lite NMC5 returns a last-replaced date via SNMP.
-  // Site access control
-  getUserSiteIds(userId) {
-    const rows = db.prepare('SELECT site_id FROM user_site_access WHERE user_id=?').all(userId);
+  // Role-based site access control
+  getRoleSiteIds(roleId) {
+    const rows = db.prepare('SELECT site_id FROM site_role_access WHERE role_id=?').all(roleId);
     return rows.map(r => r.site_id);
   },
-  setUserSites(userId, siteIds) {
+  setRoleSites(roleId, siteIds) {
     db.transaction(() => {
-      db.prepare('DELETE FROM user_site_access WHERE user_id=?').run(userId);
-      const ins = db.prepare('INSERT OR IGNORE INTO user_site_access (user_id,site_id) VALUES (?,?)');
-      for (const siteId of (siteIds || [])) ins.run(userId, siteId);
+      db.prepare('DELETE FROM site_role_access WHERE role_id=?').run(roleId);
+      const ins = db.prepare('INSERT OR IGNORE INTO site_role_access (role_id,site_id) VALUES (?,?)');
+      for (const siteId of (siteIds || [])) ins.run(roleId, siteId);
     })();
   },
-  // Returns null if user has no restriction (admin or all-access), or array of allowed site IDs
+  // Returns null (unrestricted) or array of allowed site IDs based on the role
   getAllowedSiteIds(userId, userType, roleId) {
-    // LDAP users and admins always get all sites
-    if (userType === 'ldap') return null;
     const role = this.getRole(roleId);
-    if (role && role.can_manage_sites) return null; // site managers see all
-    const ids = this.getUserSiteIds(userId);
-    // If no explicit assignments, default to all sites (backward compat)
+    // Roles with can_manage_sites always see everything
+    if (role && role.can_manage_sites) return null;
+    const ids = this.getRoleSiteIds(roleId);
+    // No explicit site assignments = all sites (default / backward compat)
     return ids.length > 0 ? ids : null;
   },
 

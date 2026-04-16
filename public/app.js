@@ -864,12 +864,12 @@ async function loadAdminData() {
   adminState.users     = users;
   adminState.groupMaps = groupMaps;
   adminState.sessions  = sessions;
-  // Load site assignments for all users
-  adminState.userSites = {};
-  await Promise.all(users.map(async u => {
+  // Load site assignments for all non-system roles
+  adminState.roleSites = {};
+  await Promise.all(roles.map(async r => {
     try {
-      adminState.userSites[u.id] = await apiFetch(`/auth/users/${u.id}/sites`);
-    } catch (_) { adminState.userSites[u.id] = []; }
+      adminState.roleSites[r.id] = await apiFetch(`/auth/roles/${r.id}/sites`);
+    } catch (_) { adminState.roleSites[r.id] = []; }
   }));
   renderAdminPage();
 }
@@ -886,29 +886,15 @@ function renderUsersTable() {
   const tbody = document.getElementById('users-tbody');
   if (!tbody) return;
   if (!adminState.users.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No local users yet</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No local users yet</td></tr>';
     return;
   }
-  tbody.innerHTML = adminState.users.map(u => {
-    const role = adminState.roles.find(r => r.id === u.role_id);
-    const isAdmin = role?.can_manage_sites;
-    const siteIds = adminState.userSites?.[u.id];
-    let siteCell;
-    if (isAdmin) {
-      siteCell = '<span style="font-size:11px;color:var(--text3)">All sites</span>';
-    } else if (!siteIds || siteIds.length === 0) {
-      siteCell = '<span style="font-size:11px;color:var(--text3)">All sites</span>';
-    } else {
-      const names = siteIds.map(id => state.sites.find(s => s.id === id)?.name || id).join(', ');
-      siteCell = `<span style="font-size:11px;color:var(--blue-text)" title="${esc(names)}">${siteIds.length} site${siteIds.length !== 1 ? 's' : ''}</span>`;
-    }
-    return `
+  tbody.innerHTML = adminState.users.map(u => `
     <tr>
       <td style="font-weight:500">${esc(u.username)}</td>
       <td>${esc(u.display_name)}</td>
       <td>${esc(u.email||'—')}</td>
       <td>${pillHtml('blue', esc(u.role_name))}</td>
-      <td>${siteCell}</td>
       <td>${u.is_active ? pillHtml('green','Active') : pillHtml('gray','Disabled')}</td>
       <td style="font-size:11px;color:var(--text3)">${u.last_login ? fmtTs(u.last_login) : 'Never'}</td>
       <td>
@@ -917,8 +903,7 @@ function renderUsersTable() {
           <button class="sm danger" onclick="deleteUser(${u.id})">Delete</button>
         </div>
       </td>
-    </tr>`;
-  }).join('');
+    </tr>`).join('');
 }
 
 function renderRolesTable() {
@@ -929,18 +914,31 @@ function renderRolesTable() {
     const labels = ['View','Devices','Sites','Users','SNMP','Poll'];
     return perms.map((p,i) => r[p] ? `<span class="pill pill-green" style="font-size:10px;padding:1px 5px">${labels[i]}</span>` : '').join(' ');
   };
-  tbody.innerHTML = adminState.roles.map(r => `
+  tbody.innerHTML = adminState.roles.map(r => {
+    const siteIds = adminState.roleSites?.[r.id] || [];
+    let siteCell;
+    if (r.can_manage_sites) {
+      siteCell = '<span style="font-size:11px;color:var(--text3)">All sites</span>';
+    } else if (!siteIds.length) {
+      siteCell = '<span style="font-size:11px;color:var(--text3)">All sites</span>';
+    } else {
+      const names = siteIds.map(id => state.sites.find(s => s.id === id)?.name || id).join(', ');
+      siteCell = `<span style="font-size:11px;color:var(--blue-text)" title="${esc(names)}">${siteIds.length} site${siteIds.length !== 1 ? 's' : ''}</span>`;
+    }
+    return `
     <tr>
       <td style="font-weight:500">${esc(r.name)} ${r.is_system ? '<span class="pill pill-gray" style="font-size:10px">system</span>' : ''}</td>
       <td style="font-size:12px;color:var(--text2)">${esc(r.description)}</td>
       <td>${permIcons(r)}</td>
+      <td>${siteCell}</td>
       <td>
         ${!r.is_system ? `<div style="display:flex;gap:4px">
           <button class="sm" onclick="openEditRole(${r.id})">Edit</button>
           <button class="sm danger" onclick="deleteRole(${r.id})">Delete</button>
         </div>` : '<span style="font-size:11px;color:var(--text3)">Protected</span>'}
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function renderGroupMapsTable() {
@@ -1001,10 +999,6 @@ function openAddUser() {
   document.getElementById('mu-sess-ttl').value  = '8';
   document.getElementById('mu-password-row').style.display = '';
   populateRoleSelects();
-  // Default to Viewer role if available so site section is visible
-  const viewer = adminState.roles.find(r => r.name === 'Viewer');
-  if (viewer) document.getElementById('mu-role').value = viewer.id;
-  renderSiteAccessCheckboxes([]);
   openModal('modal-user');
 }
 
@@ -1024,51 +1018,7 @@ function openEditUser(id) {
   document.getElementById('mu-password-row').style.display = '';
   populateRoleSelects();
   document.getElementById('mu-role').value = u.role_id;
-  // Load existing site assignments
-  apiFetch(`/auth/users/${id}/sites`).then(siteIds => {
-    renderSiteAccessCheckboxes(siteIds || []);
-  }).catch(() => renderSiteAccessCheckboxes([]));
   openModal('modal-user');
-}
-
-function renderSiteAccessCheckboxes(checkedIds) {
-  const container = document.getElementById('mu-site-checkboxes');
-  const section   = document.getElementById('mu-site-access-section');
-  const hint      = document.getElementById('mu-site-access-hint');
-  if (!container || !section) return;
-
-  // Check if the selected role is an admin-type (can_manage_sites)
-  const roleId  = parseInt(document.getElementById('mu-role')?.value);
-  const role    = adminState.roles.find(r => r.id === roleId);
-  const isAdmin = role?.can_manage_sites;
-
-  section.style.display = '';
-
-  if (isAdmin) {
-    container.innerHTML = '<span style="font-size:12px;color:var(--text3)">Admins with site management permission always see all sites.</span>';
-    if (hint) hint.textContent = '';
-    return;
-  }
-
-  if (!state.sites.length) {
-    container.innerHTML = '<span style="font-size:12px;color:var(--text3)">No sites configured yet</span>';
-    return;
-  }
-
-  container.innerHTML = state.sites.map(s => `
-    <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:400;cursor:pointer;padding:4px 0">
-      <input type="checkbox" value="${s.id}" ${checkedIds.includes(s.id) ? 'checked' : ''}
-        style="width:auto;cursor:pointer">
-      <span>${esc(s.name)}</span>${s.location ? `<span style="font-size:11px;color:var(--text3);margin-left:4px">${esc(s.location)}</span>` : ''}
-    </label>`).join('');
-  if (hint) hint.textContent = 'Check the sites this user can access. Leave all unchecked to grant access to all sites.';
-}
-
-function getSiteAccessIds() {
-  const container = document.getElementById('mu-site-checkboxes');
-  if (!container) return [];
-  return Array.from(container.querySelectorAll('input[type=checkbox]:checked'))
-    .map(cb => parseInt(cb.value));
 }
 
 async function saveUser() {
@@ -1081,7 +1031,6 @@ async function saveUser() {
     is_active:     document.getElementById('mu-active').checked,
     session_type:  document.getElementById('mu-sess-type').value,
     session_ttl_h: parseInt(document.getElementById('mu-sess-ttl').value)||8,
-    site_ids:      getSiteAccessIds(),
   };
   if (!body.username && !adminState.editUserId) { toast('Username is required','error'); return; }
   if (!body.password && !adminState.editUserId) { toast('Password is required for new users','error'); return; }
@@ -1113,6 +1062,7 @@ function openAddRole() {
   ['mr-name','mr-desc'].forEach(id=>document.getElementById(id).value='');
   ['mr-view','mr-edit-dev','mr-manage-sites','mr-manage-users','mr-manage-snmp','mr-poll'].forEach(id=>{ document.getElementById(id).checked=false; });
   document.getElementById('mr-view').checked = true;
+  renderRoleSiteCheckboxes([]);
   openModal('modal-role');
 }
 
@@ -1130,7 +1080,42 @@ function openEditRole(id) {
   document.getElementById('mr-manage-users').checked  = !!r.can_manage_users;
   document.getElementById('mr-manage-snmp').checked   = !!r.can_manage_snmp;
   document.getElementById('mr-poll').checked          = !!r.can_poll;
+  const siteIds = adminState.roleSites?.[id] || [];
+  renderRoleSiteCheckboxes(siteIds);
   openModal('modal-role');
+}
+
+function renderRoleSiteCheckboxes(checkedIds) {
+  const container = document.getElementById('mr-site-checkboxes');
+  const section   = document.getElementById('mr-site-access-section');
+  const hint      = document.getElementById('mr-site-access-hint');
+  if (!container || !section) return;
+  // If can_manage_sites is checked, show note that they see everything
+  const isAdmin = document.getElementById('mr-manage-sites')?.checked;
+  section.style.display = '';
+  if (isAdmin) {
+    container.innerHTML = '<span style="font-size:12px;color:var(--text3)">Roles with site management permission always see all sites.</span>';
+    if (hint) hint.textContent = '';
+    return;
+  }
+  if (!state.sites.length) {
+    container.innerHTML = '<span style="font-size:12px;color:var(--text3)">No sites configured yet</span>';
+    return;
+  }
+  container.innerHTML = state.sites.map(s => `
+    <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:400;cursor:pointer;padding:4px 0">
+      <input type="checkbox" value="${s.id}" ${checkedIds.includes(s.id) ? 'checked' : ''}
+        style="width:auto;cursor:pointer">
+      <span>${esc(s.name)}</span>${s.location ? `<span style="font-size:11px;color:var(--text3);margin-left:4px">${esc(s.location)}</span>` : ''}
+    </label>`).join('');
+  if (hint) hint.textContent = 'Restrict this role to specific sites. Leave all unchecked to grant access to all sites.';
+}
+
+function getRoleSiteIds() {
+  const container = document.getElementById('mr-site-checkboxes');
+  if (!container) return [];
+  return Array.from(container.querySelectorAll('input[type=checkbox]:checked'))
+    .map(cb => parseInt(cb.value)).filter(Boolean);
 }
 
 async function saveRole() {
@@ -1143,6 +1128,7 @@ async function saveRole() {
     can_manage_users: document.getElementById('mr-manage-users').checked,
     can_manage_snmp:  document.getElementById('mr-manage-snmp').checked,
     can_poll:         document.getElementById('mr-poll').checked,
+    site_ids:         getRoleSiteIds(),
   };
   if (!body.name) { toast('Role name required','error'); return; }
   try {
