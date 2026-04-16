@@ -90,7 +90,7 @@ async function authenticateLdap(username, password) {
   let serviceClient;
   try {
     serviceClient = createClient(cfg);
-    await bindClient(serviceClient, cfg.bind_dn, cfg.bind_password);
+    await bindClient(serviceClient, cfg.bind_dn, cfg.bind_password || '');
   } catch (err) {
     try { await unbindClient(serviceClient); } catch (_) {}
     return { success: false, error: 'LDAP service bind failed: ' + err.message };
@@ -113,10 +113,21 @@ async function authenticateLdap(username, password) {
   }
 
   const entry = entries[0];
-  const userDn = entry.objectName || entry.dn?.toString();
+  // ldapjs returns the DN differently depending on version -- handle all cases
+  let userDn = null;
+  if (typeof entry.objectName === 'string' && entry.objectName) {
+    userDn = entry.objectName;
+  } else if (entry.objectName && typeof entry.objectName.toString === 'function') {
+    userDn = entry.objectName.toString();
+  } else if (entry.dn && typeof entry.dn === 'string') {
+    userDn = entry.dn;
+  } else if (entry.dn && typeof entry.dn.toString === 'function') {
+    userDn = entry.dn.toString();
+  }
 
-  if (!userDn) {
-    return { success: false, error: 'Could not resolve user DN' };
+  if (!userDn || typeof userDn !== 'string') {
+    console.error('[ldap] Could not resolve DN. entry keys:', Object.keys(entry), 'objectName:', entry.objectName, 'dn:', entry.dn);
+    return { success: false, error: 'Could not resolve user DN from directory entry' };
   }
 
   let userClient;

@@ -225,7 +225,14 @@ router.get('/ldap/config', requirePerm('can_manage_users'), (req, res) => {
 
 router.post('/ldap/config', requirePerm('can_manage_users'), (req, res) => {
   try {
-    const saved = db.saveLdapConfig(req.body);
+    // Don't overwrite the stored password if the field was left blank or
+    // still contains the masked placeholder sent by the GET endpoint
+    const body = { ...req.body };
+    if (!body.bind_password || body.bind_password === '********') {
+      const existing = db.getLdapConfig();
+      body.bind_password = existing.bind_password || '';
+    }
+    const saved = db.saveLdapConfig(body);
     db.auditLog(req.session.username, req.ip, 'UPDATE_LDAP_CONFIG', 'ldap', '', true);
     ok(res, { ...saved, bind_password: saved.bind_password ? '********' : '' });
   } catch (e) { err(res, e.message); }
