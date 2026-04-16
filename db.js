@@ -394,10 +394,10 @@ module.exports = {
   // Returns null (unrestricted) or array of allowed site IDs based on the role
   getAllowedSiteIds(userId, userType, roleId) {
     const role = this.getRole(roleId);
-    // Roles with can_manage_sites always see everything
+    // Roles with can_manage_sites see all sites unconditionally
     if (role && role.can_manage_sites) return null;
+    // Check role-based site restrictions -- applies to all user types
     const ids = this.getRoleSiteIds(roleId);
-    // No explicit site assignments = all sites (default / backward compat)
     return ids.length > 0 ? ids : null;
   },
 

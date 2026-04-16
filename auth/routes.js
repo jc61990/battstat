@@ -111,16 +111,14 @@ router.post('/logout', (req, res) => {
 
 router.get('/me', requireAuth, (req, res) => {
   const s = req.session;
-  // Get site restrictions for local users (null = unrestricted = sees all)
-  const allowedSiteIds = s.user_type === 'local'
-    ? db.getAllowedSiteIds(s.user_id, s.user_type, s.role_id)
-    : null;
+  // Get site restrictions based on role -- applies to both local and LDAP users
+  const allowedSiteIds = db.getAllowedSiteIds(s.user_id, s.user_type, s.role_id);
   ok(res, {
     username:        s.username,
     display_name:    s.display_name,
     user_type:       s.user_type,
     role_name:       s.role_name,
-    allowed_site_ids: allowedSiteIds,  // null = all sites, array = restricted
+    allowed_site_ids: allowedSiteIds,
     permissions: {
       can_view:         !!s.can_view,
       can_edit_devices: !!s.can_edit_devices,
