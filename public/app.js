@@ -433,8 +433,8 @@ function renderDeviceTable() {
       <td class="last-seen">${fmtTs(p?.polled_at)}</td>
       <td onclick="event.stopPropagation()">
         <div style="display:flex;gap:4px">
-          <button class="sm" onclick="openEditDevice(${d.id})">Edit</button>
-          <button class="sm" title="Poll now" onclick="pollNow(${d.id},this)">↻</button>
+          ${currentUser?.permissions?.can_edit_devices ? `<button class="sm" onclick="openEditDevice(${d.id})">Edit</button>` : ''}
+          ${currentUser?.permissions?.can_poll ? `<button class="sm" title="Poll now" onclick="pollNow(${d.id},this)">↻</button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -447,6 +447,7 @@ function renderSitesTable() {
     tbody.innerHTML = `<tr class="empty-row"><td colspan="5">No sites yet. Add your first site to get started.</td></tr>`;
     return;
   }
+  const canManage = currentUser?.permissions?.can_manage_sites;
   tbody.innerHTML = state.sites.map(site => {
     const devs = state.devices.filter(d => d.site_id === site.id);
     let g = 0, y = 0, r = 0;
@@ -463,10 +464,10 @@ function renderSitesTable() {
       <td>${devs.length}</td>
       <td>${statusHtml}</td>
       <td onclick="event.stopPropagation()">
-        <div style="display:flex;gap:4px">
+        ${canManage ? `<div style="display:flex;gap:4px">
           <button class="sm" onclick="openEditSite(${site.id})">Edit</button>
           <button class="sm danger" onclick="deleteSite(${site.id})">Delete</button>
-        </div>
+        </div>` : ''}
       </td>
     </tr>`;
   }).join('');
@@ -567,9 +568,9 @@ function openDrawer(deviceId) {
     ${d.notes ? `<div class="dp-sec"><div class="dp-sec-title">Notes</div><div style="font-size:12px;color:var(--text2)">${esc(d.notes)}</div></div>` : ''}
 
     <div style="display:flex;gap:8px;margin-top:4px">
-      <button onclick="openEditDevice(${d.id});closeDrawer()">Edit device</button>
-      <button onclick="pollNow(${d.id},this)">↻ Poll now</button>
-      <button class="danger sm" onclick="deleteDevice(${d.id})">Delete</button>
+      ${currentUser?.permissions?.can_edit_devices ? `<button onclick="openEditDevice(${d.id});closeDrawer()">Edit device</button>` : ''}
+      ${currentUser?.permissions?.can_poll ? `<button onclick="pollNow(${d.id},this)">↻ Poll now</button>` : ''}
+      ${currentUser?.permissions?.can_edit_devices ? `<button class="danger sm" onclick="deleteDevice(${d.id})">Delete</button>` : ''}
     </div>
   `;
 
