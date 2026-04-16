@@ -77,6 +77,22 @@ const OID = {
   rfc1628InputVoltage:  '1.3.6.1.2.1.33.1.3.3.1.3.1',
   rfc1628OutputVoltage: '1.3.6.1.2.1.33.1.4.4.1.2.1',
   rfc1628OutputLoad:    '1.3.6.1.2.1.33.1.4.4.1.5.1',
+
+  // APC -- additional diagnostics
+  apcInputFrequency:    '1.3.6.1.4.1.318.1.1.1.3.2.4.0',  // Hz (tenths? usually whole number)
+  apcLastXferReason:    '1.3.6.1.4.1.318.1.1.1.3.2.5.0',  // INTEGER 1-10
+  apcOutputCurrent:     '1.3.6.1.4.1.318.1.1.1.4.2.4.0',  // Amps
+  apcOutputFrequency:   '1.3.6.1.4.1.318.1.1.1.4.2.2.0',  // Hz
+  apcSelfTestResult:    '1.3.6.1.4.1.318.1.1.1.7.2.3.0',  // STRING "OK", "Failed", "Invalid"
+  apcSelfTestDate:      '1.3.6.1.4.1.318.1.1.1.7.2.4.0',  // STRING date
+  apcTransferCount:     '1.3.6.1.4.1.318.1.1.1.2.2.6.0',  // INTEGER count of transfers to battery
+
+  // Tripp Lite NMC5 -- additional diagnostics
+  tlInputFrequency:     '1.3.6.1.4.1.850.1.1.3.1.3.2.2.1.2.1.1', // Hz (tenths)
+  tlOutputCurrent:      '1.3.6.1.4.1.850.1.1.3.1.3.3.2.1.3.1.1', // Amps (tenths)
+  tlSelfTestResult:     '1.3.6.1.4.1.850.1.1.3.1.3.1.4.1.1.1.1', // INTEGER 1=pass 2=fail 3=inProgress
+  tlSelfTestDate:       '1.3.6.1.4.1.850.1.1.3.1.3.1.4.1.3.1.1', // STRING date
+  tlLastXferReason:     '1.3.6.1.4.1.850.1.1.3.1.3.2.1.1.2.1',   // INTEGER transfer reason
 };
 
 // ── Replacement battery part number lookup ────────────────────────────────────
@@ -140,6 +156,28 @@ function lookupPartNumber(modelSnmp) {
 const APC_BATT_STATUS    = { 1:'unknown', 2:'batteryNormal', 3:'batteryLow', 4:'batteryInFaultCondition' };
 const CYBER_BATT_STATUS  = { 1:'unknown', 2:'batteryNormal', 3:'batteryLow', 4:'batteryDepleted' };
 const TL_BATT_STATUS     = { 1:'unknown', 2:'batteryNormal', 3:'batteryLow', 4:'batteryDepleted' };
+
+const APC_XFER_REASON = {
+  1:  'No events',
+  2:  'High line voltage',
+  3:  'Brownout',
+  4:  'Loss of mains power',
+  5:  'Small temporary power drop',
+  6:  'Large temporary power drop',
+  7:  'Small spike',
+  8:  'Large spike',
+  9:  'Self test',
+  10: 'Excessive input voltage fluctuation',
+};
+
+const TL_XFER_REASON = {
+  1: 'No transfer',
+  2: 'High line voltage',
+  3: 'Brownout',
+  4: 'Loss of mains power',
+  5: 'Self test',
+  6: 'Overload',
+};
 
 // ── SNMP session builder ──────────────────────────────────────────────────────
 
@@ -209,6 +247,8 @@ function oidListForVendor(vendor) {
       OID.tlInputVoltage, OID.tlOutputVoltage, OID.tlOutputLoad,
       OID.tlModel, OID.tlSerial, OID.tlFirmware,
       OID.tlLastReplaceDate, OID.tlNextReplaceDate,
+      OID.tlInputFrequency, OID.tlOutputCurrent,
+      OID.tlSelfTestResult, OID.tlSelfTestDate, OID.tlLastXferReason,
       OID.rfc1628BattCapacity, OID.rfc1628BattStatus, OID.rfc1628BattRunTime,
       OID.rfc1628BattTemp, OID.rfc1628InputVoltage, OID.rfc1628OutputVoltage,
       OID.rfc1628OutputLoad];
@@ -218,7 +258,10 @@ function oidListForVendor(vendor) {
     OID.apcBattCapacity, OID.apcBattStatus, OID.apcBattTempC,
     OID.apcBattRunTime, OID.apcBattReplaceDate,
     OID.apcInputVoltage, OID.apcOutputVoltage, OID.apcOutputLoad,
-    OID.apcModel, OID.apcSerial, OID.apcFirmware];
+    OID.apcModel, OID.apcSerial, OID.apcFirmware,
+    OID.apcInputFrequency, OID.apcOutputCurrent, OID.apcOutputFrequency,
+    OID.apcSelfTestResult, OID.apcSelfTestDate,
+    OID.apcLastXferReason, OID.apcTransferCount];
 }
 
 // ── Parse varbinds into normalised result object ──────────────────────────────
@@ -277,12 +320,19 @@ function parseVarbinds(varbinds, vendor) {
       batt_temperature,
       batt_run_time,
       batt_replace_date,
-      input_voltage:  tlInV  !== null ? Math.round(tlInV  / 10) : getInt(OID.rfc1628InputVoltage),
-      output_voltage: tlOutV !== null ? Math.round(tlOutV / 10) : getInt(OID.rfc1628OutputVoltage),
-      output_load:    getInt(OID.tlOutputLoad) ?? getInt(OID.rfc1628OutputLoad),
-      model_snmp:  get(OID.tlModel) || get(OID.sysDescr),
-      serial_snmp: get(OID.tlSerial),
-      firmware:    get(OID.tlFirmware),
+      input_voltage:    tlInV  !== null ? Math.round(tlInV  / 10) : getInt(OID.rfc1628InputVoltage),
+      output_voltage:   tlOutV !== null ? Math.round(tlOutV / 10) : getInt(OID.rfc1628OutputVoltage),
+      output_load:      getInt(OID.tlOutputLoad) ?? getInt(OID.rfc1628OutputLoad),
+      model_snmp:       get(OID.tlModel) || get(OID.sysDescr),
+      serial_snmp:      get(OID.tlSerial),
+      firmware:         get(OID.tlFirmware),
+      // Diagnostics -- tenths conversion where needed
+      input_frequency:  (() => { const v = getInt(OID.tlInputFrequency); return v !== null ? Math.round(v / 10) : null; })(),
+      output_current:   (() => { const v = getInt(OID.tlOutputCurrent);  return v !== null ? Math.round(v / 10) : null; })(),
+      self_test_result: (() => { const v = getInt(OID.tlSelfTestResult); return v === 1 ? 'Pass' : v === 2 ? 'Fail' : v === 3 ? 'In Progress' : null; })(),
+      self_test_date:   get(OID.tlSelfTestDate) || null,
+      last_xfer_reason: getInt(OID.tlLastXferReason),
+      transfer_count:   null, // not available on Tripp Lite NMC5
       // Not saved to poll_results -- used by poller to auto-fill device.battery_installed
       battery_installed_snmp: get(OID.tlLastReplaceDate) || null,
     };
@@ -338,6 +388,12 @@ function parseVarbinds(varbinds, vendor) {
     model_snmp:       get(OID.apcModel) || get(OID.sysDescr),
     serial_snmp:      get(OID.apcSerial),
     firmware:         get(OID.apcFirmware),
+    input_frequency:  getInt(OID.apcInputFrequency),
+    output_current:   getInt(OID.apcOutputCurrent),
+    self_test_result: get(OID.apcSelfTestResult) || null,
+    self_test_date:   get(OID.apcSelfTestDate)   || null,
+    last_xfer_reason: getInt(OID.apcLastXferReason),
+    transfer_count:   getInt(OID.apcTransferCount),
   };
 }
 

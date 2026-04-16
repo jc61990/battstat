@@ -1,6 +1,12 @@
 'use strict';
 
 const API = '/api';
+const APC_XFER_REASON = {
+  1:'No events', 2:'High line voltage', 3:'Brownout', 4:'Loss of mains power',
+  5:'Small temporary power drop', 6:'Large temporary power drop',
+  7:'Small spike', 8:'Large spike', 9:'Self test', 10:'Excessive voltage fluctuation',
+};
+
 let state = {
   sites: [],
   devices: [],
@@ -551,10 +557,20 @@ function openDrawer(deviceId) {
 
     <div class="dp-sec">
       <div class="dp-sec-title">Power readings</div>
-      <div class="dp-row"><span class="dp-key">Input voltage</span><span class="dp-val">${p?.input_voltage !== null && p?.input_voltage !== undefined ? p.input_voltage + ' V' : '—'}</span></div>
-      <div class="dp-row"><span class="dp-key">Output voltage</span><span class="dp-val">${p?.output_voltage !== null && p?.output_voltage !== undefined ? p.output_voltage + ' V' : '—'}</span></div>
-      <div class="dp-row"><span class="dp-key">Output load</span><span class="dp-val">${p?.output_load !== null && p?.output_load !== undefined ? p.output_load + '%' : '—'}</span></div>
-      <div class="dp-row"><span class="dp-key">Temperature</span><span class="dp-val">${p?.batt_temperature !== null && p?.batt_temperature !== undefined ? p.batt_temperature + '°C' : '—'}</span></div>
+      <div class="dp-row"><span class="dp-key">Input voltage</span><span class="dp-val">${p?.input_voltage != null ? p.input_voltage + ' V' : '—'}</span></div>
+      <div class="dp-row"><span class="dp-key">Input frequency</span><span class="dp-val">${p?.input_frequency != null ? p.input_frequency + ' Hz' : '—'}</span></div>
+      <div class="dp-row"><span class="dp-key">Output voltage</span><span class="dp-val">${p?.output_voltage != null ? p.output_voltage + ' V' : '—'}</span></div>
+      <div class="dp-row"><span class="dp-key">Output load</span><span class="dp-val">${p?.output_load != null ? p.output_load + '%' : '—'}</span></div>
+      <div class="dp-row"><span class="dp-key">Output current</span><span class="dp-val">${p?.output_current != null ? p.output_current + ' A' : '—'}</span></div>
+      <div class="dp-row"><span class="dp-key">Temperature</span><span class="dp-val">${p?.batt_temperature != null ? p.batt_temperature + '°C' : '—'}</span></div>
+    </div>
+
+    <div class="dp-sec">
+      <div class="dp-sec-title">Diagnostics</div>
+      <div class="dp-row"><span class="dp-key">Last self test</span><span class="dp-val">${esc(p?.self_test_result || '—')}</span></div>
+      <div class="dp-row"><span class="dp-key">Self test date</span><span class="dp-val">${fmtDate(p?.self_test_date) || '—'}</span></div>
+      <div class="dp-row"><span class="dp-key">Last transfer reason</span><span class="dp-val">${p?.last_xfer_reason != null ? (APC_XFER_REASON[p.last_xfer_reason] || 'Reason ' + p.last_xfer_reason) : '—'}</span></div>
+      <div class="dp-row"><span class="dp-key">Transfer count</span><span class="dp-val">${p?.transfer_count != null ? p.transfer_count : '—'}</span></div>
     </div>
 
     <div class="dp-sec">

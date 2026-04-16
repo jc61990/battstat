@@ -52,7 +52,13 @@ db.exec(`
     model_snmp        TEXT,
     serial_snmp       TEXT,
     firmware          TEXT,
-    raw_error         TEXT
+    raw_error         TEXT,
+    input_frequency   INTEGER,
+    output_current    INTEGER,
+    self_test_result  TEXT,
+    self_test_date    TEXT,
+    last_xfer_reason  INTEGER,
+    transfer_count    INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS snmp_config (
@@ -231,8 +237,18 @@ module.exports = {
   deleteDevice(id) { return db.prepare('DELETE FROM devices WHERE id=?').run(id); },
 
   savePollResult(deviceId, data) {
-    return db.prepare('INSERT INTO poll_results (device_id,reachable,batt_capacity,batt_status,batt_replace_date,batt_run_time,batt_temperature,input_voltage,output_voltage,output_load,model_snmp,serial_snmp,firmware,raw_error) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(deviceId,data.reachable?1:0,data.batt_capacity??null,data.batt_status??null,data.batt_replace_date??null,data.batt_run_time??null,data.batt_temperature??null,data.input_voltage??null,data.output_voltage??null,data.output_load??null,data.model_snmp??null,data.serial_snmp??null,data.firmware??null,data.raw_error??null);
+    return db.prepare(`INSERT INTO poll_results
+      (device_id,reachable,batt_capacity,batt_status,batt_replace_date,batt_run_time,
+       batt_temperature,input_voltage,output_voltage,output_load,model_snmp,serial_snmp,
+       firmware,raw_error,input_frequency,output_current,self_test_result,self_test_date,
+       last_xfer_reason,transfer_count)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(deviceId, data.reachable?1:0, data.batt_capacity??null, data.batt_status??null,
+        data.batt_replace_date??null, data.batt_run_time??null, data.batt_temperature??null,
+        data.input_voltage??null, data.output_voltage??null, data.output_load??null,
+        data.model_snmp??null, data.serial_snmp??null, data.firmware??null, data.raw_error??null,
+        data.input_frequency??null, data.output_current??null, data.self_test_result??null,
+        data.self_test_date??null, data.last_xfer_reason??null, data.transfer_count??null);
   },
   getLatestPoll(deviceId) {
     return db.prepare('SELECT * FROM poll_results WHERE device_id=? ORDER BY polled_at DESC LIMIT 1').get(deviceId);

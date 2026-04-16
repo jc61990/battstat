@@ -145,6 +145,16 @@ apply(10, 'add_site_role_access', (db) => {
   for (const row of userSites) ins.run(row.role_id, row.site_id);
 });
 
+apply(11, 'add_poll_diagnostics', (db) => {
+  const cols = db.prepare('PRAGMA table_info(poll_results)').all().map(c => c.name);
+  if (!cols.includes('input_frequency'))  db.exec('ALTER TABLE poll_results ADD COLUMN input_frequency  INTEGER');
+  if (!cols.includes('output_current'))   db.exec('ALTER TABLE poll_results ADD COLUMN output_current   INTEGER');
+  if (!cols.includes('self_test_result')) db.exec('ALTER TABLE poll_results ADD COLUMN self_test_result TEXT');
+  if (!cols.includes('self_test_date'))   db.exec('ALTER TABLE poll_results ADD COLUMN self_test_date   TEXT');
+  if (!cols.includes('last_xfer_reason')) db.exec('ALTER TABLE poll_results ADD COLUMN last_xfer_reason INTEGER');
+  if (!cols.includes('transfer_count'))   db.exec('ALTER TABLE poll_results ADD COLUMN transfer_count   INTEGER');
+});
+
 // -- Summary -------------------------------------------------------------------
 const allMigrations = db.prepare('SELECT * FROM schema_migrations ORDER BY version').all();
 console.log(`\n[migrate] ${allMigrations.length} migration(s) recorded in schema_migrations.`);
