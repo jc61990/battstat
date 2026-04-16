@@ -215,15 +215,17 @@ function replacePill(device) {
 
 async function loadAll() {
   try {
-    const [sites, devices, polls] = await Promise.all([
+    const [sites, devices, polls, me] = await Promise.all([
       apiFetch('/sites'),
       apiFetch('/devices'),
       apiFetch('/poll/latest'),
+      apiFetch('/auth/me'),
     ]);
-    state.sites = sites;
+    state.sites   = sites;
     state.devices = devices;
-    state.polls = {};
+    state.polls   = {};
     for (const p of polls) state.polls[p.device_id] = p;
+    state.allowedSiteIds = me.allowed_site_ids || null;
     renderAll();
   } catch (e) {
     toast('Failed to load data: ' + e.message, 'error');
