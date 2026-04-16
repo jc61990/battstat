@@ -13,13 +13,18 @@ function escLdap(str) {
 }
 
 function createClient(cfg) {
-  return ldap.createClient({
-    url:              cfg.url,
-    timeout:          cfg.connect_timeout_ms || 5000,
-    connectTimeout:   cfg.connect_timeout_ms || 5000,
-    tlsOptions:       cfg.tls_verify ? {} : { rejectUnauthorized: false },
-    reconnect:        false,
+  const client = ldap.createClient({
+    url:            cfg.url,
+    timeout:        cfg.connect_timeout_ms || 5000,
+    connectTimeout: cfg.connect_timeout_ms || 5000,
+    tlsOptions:     cfg.tls_verify ? {} : { rejectUnauthorized: false },
+    reconnect:      false,
   });
+  // Attach a no-op error handler immediately to prevent unhandled 'error'
+  // events from crashing Node when TLS/connection fails before bind() fires.
+  // bindClient() and searchUser() have their own error handling via callbacks.
+  client.on('error', () => {});
+  return client;
 }
 
 function bindClient(client, dn, password) {

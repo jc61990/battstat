@@ -133,9 +133,16 @@ is_git_repo() {
 }
 
 get_git_version() {
+  # Try APP_DIR first, then fall back to wherever the script is running from
+  local repo=""
   if is_git_repo "$APP_DIR"; then
-    git -C "$APP_DIR" describe --tags --always 2>/dev/null \
-      || git -C "$APP_DIR" rev-parse --short HEAD 2>/dev/null \
+    repo="$APP_DIR"
+  elif [ -n "${SCRIPT_DIR:-}" ] && is_git_repo "$SCRIPT_DIR"; then
+    repo="$SCRIPT_DIR"
+  fi
+  if [ -n "$repo" ]; then
+    # Show short hash + first line of commit message, e.g. "abc1234 Fix CSP headers"
+    git -C "$repo" log -1 --format="%h %s" 2>/dev/null \
       || echo "unknown"
   else
     echo "unknown"
@@ -277,6 +284,139 @@ prune_old_backups() {
     count=$(( count + 1 ))
   done <<< "$to_delete"
   [ "$count" -gt 0 ] && info "Pruned ${count} old backup(s), kept ${keep} most recent"
+}
+
+# -- nginx reverse proxy setup -------------------------------------------------
+setup_nginx() {
+  local hostname="$1"
+
+  info "Setting up nginx reverse proxy for https://${hostname}..."
+
+  # Install nginx if missing
+  if ! command -v nginx &>/dev/null; then
+    info "Installing nginx..."
+    case "$DISTRO" in
+      debian) apt-get install -y nginx ;;
+      fedora|rhel) "${PKG_MGR}" install -y nginx ;;
+    esac
+  fi
+
+  # Install openssl if missing
+  if ! command -v openssl &>/dev/null; then
+    info "Installing openssl..."
+    case "$DISTRO" in
+      debian) apt-get install -y openssl ;;
+      fedora|rhel) "${PKG_MGR}" install -y openssl ;;
+    esac
+  fi
+
+  # Generate self-signed certificate
+  local cert_dir="/etc/ssl/battstat"
+  mkdir -p "$cert_dir"
+  chmod 700 "$cert_dir"
+
+  if [ ! -f "${cert_dir}/${hostname}.crt" ]; then
+    info "Generating self-signed certificate for ${hostname}..."
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+      -keyout "${cert_dir}/${hostname}.key" \
+      -out    "${cert_dir}/${hostname}.crt" \
+      -subj   "/CN=${hostname}" \
+      -addext "subjectAltName=DNS:${hostname}" \
+      2>/dev/null
+    chmod 600 "${cert_dir}/${hostname}.key"
+    success "Certificate generated at ${cert_dir}/${hostname}.crt"
+  else
+    info "Certificate already exists -- skipping generation"
+  fi
+
+  # Write nginx site config
+  local nginx_conf="/etc/nginx/sites-available/battstat"
+  # Fedora/RHEL uses conf.d instead of sites-available
+  if [ ! -d /etc/nginx/sites-available ]; then
+    nginx_conf="/etc/nginx/conf.d/battstat.conf"
+  fi
+
+  cat > "$nginx_conf" << NGINXEOF
+# BattStat reverse proxy -- managed by install.sh
+# Regenerate with: sudo bash ${APP_DIR}/install.sh
+
+server {
+    listen 80;
+    server_name ${hostname};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name ${hostname};
+
+    ssl_certificate     ${cert_dir}/${hostname}.crt;
+    ssl_certificate_key ${cert_dir}/${hostname}.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    # Proxy to BattStat
+    location / {
+        proxy_pass         http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade    \$http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 86400s;
+        proxy_buffering    off;
+    }
+}
+NGINXEOF
+
+  success "Nginx config written to ${nginx_conf}"
+
+  # Enable the site on Debian/Ubuntu (sites-available/sites-enabled pattern)
+  if [ -d /etc/nginx/sites-enabled ]; then
+    ln -sf "$nginx_conf" /etc/nginx/sites-enabled/battstat 2>/dev/null || true
+  fi
+
+  # Test and reload nginx
+  if nginx -t 2>/dev/null; then
+    systemctl enable nginx 2>/dev/null || true
+    systemctl reload nginx 2>/dev/null || systemctl start nginx
+    success "Nginx configured and reloaded"
+  else
+    error "Nginx config test failed -- check: nginx -t"
+    return 1
+  fi
+
+  # Update the service file to use HTTPS mode and lock to localhost
+  local svc_file="$SERVICE_FILE"
+  # Switch HOST to 127.0.0.1 -- nginx handles external access
+  sed -i 's/^Environment=HOST=.*/Environment=HOST=127.0.0.1/' "$svc_file"
+  # Enable secure cookie flag
+  sed -i 's/^# Environment=HTTPS=true/Environment=HTTPS=true/' "$svc_file"
+  # Set allowed origin
+  if grep -q "ALLOWED_ORIGIN" "$svc_file"; then
+    sed -i "s|^# Environment=ALLOWED_ORIGIN=.*|Environment=ALLOWED_ORIGIN=https://${hostname}|" "$svc_file"
+  else
+    echo "Environment=ALLOWED_ORIGIN=https://${hostname}" >> "$svc_file"
+  fi
+  systemctl daemon-reload
+  success "Service updated: HOST=127.0.0.1, HTTPS=true, ALLOWED_ORIGIN=https://${hostname}"
+
+  # Open firewall for HTTPS if needed
+  if command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then
+    ufw allow 443/tcp comment "BattStat HTTPS" 2>/dev/null || true
+    ufw allow 80/tcp  comment "BattStat HTTP redirect" 2>/dev/null || true
+    info "ufw: opened ports 80 and 443"
+  fi
+  if command -v firewall-cmd &>/dev/null; then
+    firewall-cmd --permanent --add-service=https 2>/dev/null || true
+    firewall-cmd --permanent --add-service=http  2>/dev/null || true
+    firewall-cmd --reload 2>/dev/null || true
+    info "firewalld: opened http and https services"
+  fi
 }
 
 # -- Post-install summary ------------------------------------------------------

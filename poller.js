@@ -59,7 +59,7 @@ const OID = {
   tlBattCapacity:    '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.4.1',    // % INTEGER 100
   tlBattStatus:      '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.2.1',    // Gauge32 0=normal
   tlBattRunTime:     '1.3.6.1.4.1.850.1.1.3.1.3.1.1.1.3.1',    // seconds Gauge32 1092
-  tlBattTemp:        '1.3.6.1.4.1.850.1.1.3.1.3.4.1.1.1.1',    // Gauge32 599 (tenths C)
+  tlBattTemp:        '1.3.6.1.4.1.850.1.1.3.1.3.4.1.1.1.1',    // Gauge32 599 = 59.9F (tenths of Fahrenheit)
   tlInputVoltage:    '1.3.6.1.4.1.850.1.1.3.1.3.2.2.1.3.1.1',  // Gauge32 1130 (tenths V)
   tlOutputVoltage:   '1.3.6.1.4.1.850.1.1.3.1.3.3.2.1.2.1.1',  // Gauge32 1200 (tenths V)
   tlOutputLoad:      '1.3.6.1.4.1.850.1.1.3.1.3.3.2.1.10.1.1', // % Gauge32
@@ -258,11 +258,10 @@ function parseVarbinds(varbinds, vendor) {
       ? Math.floor(tlRt / 60)
       : rfcRt !== null ? Math.floor(rfcRt / 6000) : null;
 
-    // Temperature: NMC5 returns tenths of degrees (599 = 59.9F = ~15.5C... or just 59.9C?)
-    // 599 seems too high for C, likely tenths: 59.9F = 15.5C. Divide by 10.
+    // Temperature: NMC5 returns tenths of Fahrenheit (599 = 59.9F = 15.5C)
     const tlTempRaw = getInt(OID.tlBattTemp);
     const batt_temperature = tlTempRaw !== null
-      ? Math.round(tlTempRaw / 10)
+      ? Math.round((tlTempRaw / 10 - 32) * 5 / 9)
       : getInt(OID.rfc1628BattTemp);
 
     // Voltages: NMC5 in tenths of volts (1130 = 113.0V)

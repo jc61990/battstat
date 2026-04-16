@@ -27,7 +27,6 @@ if [ "$SCRIPT_DIR" != "$APP_DIR" ]; then
   fi
   success "Files copied to ${APP_DIR}"
 
-  # Preserve .git if source was a git clone -- enables git-based upgrades later
   if ! is_git_repo "$APP_DIR" && is_git_repo "$SCRIPT_DIR"; then
     info "Preserving git repository metadata..."
     cp -r "${SCRIPT_DIR}/.git" "${APP_DIR}/.git"
@@ -41,14 +40,46 @@ mkdir -p "$DATA_DIR"
 ensure_build_tools
 npm_install
 fix_permissions
+
+# -- Optional nginx reverse proxy setup ----------------------------------------
+SETUP_NGINX=0
+NGINX_HOSTNAME=""
+
+echo ""
+read -r -p "Set up nginx reverse proxy with HTTPS? [y/N] " NGINX_ANSWER
+if [[ "$NGINX_ANSWER" =~ ^[Yy]$ ]]; then
+  SETUP_NGINX=1
+  echo ""
+  read -r -p "Hostname (e.g. battstat.company.com): " NGINX_HOSTNAME
+  NGINX_HOSTNAME="${NGINX_HOSTNAME// /}"  # strip spaces
+  if [ -z "$NGINX_HOSTNAME" ]; then
+    warn "No hostname entered -- skipping nginx setup"
+    SETUP_NGINX=0
+  fi
+fi
+
+if [ "$SETUP_NGINX" -eq 1 ]; then
+  setup_nginx "$NGINX_HOSTNAME"
+fi
+
 install_service
 
 if start_service; then
   header "Installation complete"
-  print_dashboard_url
+
+  if [ "$SETUP_NGINX" -eq 1 ] && [ -n "$NGINX_HOSTNAME" ]; then
+    echo ""
+    echo -e "${GREEN}${BOLD}  Dashboard -> https://${NGINX_HOSTNAME}${RESET}"
+    echo ""
+    warn "Self-signed cert: your browser will show a security warning."
+    echo "  Accept it, or install the cert in your browser/OS trust store:"
+    echo "  /etc/ssl/certs/${NGINX_HOSTNAME}.crt"
+  else
+    print_dashboard_url
+  fi
+
   print_useful_commands
 
-  # Only prompt for first admin if no users exist yet
   USER_COUNT=$(DB_PATH="${DATA_DIR}/battstat.db" \
     node -e "try{const d=require('${APP_DIR}/db');process.stdout.write(String(d.getUsers().length))}catch(e){process.stdout.write('0')}" \
     2>/dev/null || echo "0")
@@ -63,7 +94,7 @@ if start_service; then
     info "${USER_COUNT} existing user(s) found -- skipping admin creation."
   fi
 
-  if command -v firewall-cmd &>/dev/null; then
+  if command -v firewall-cmd &>/dev/null && [ "$SETUP_NGINX" -eq 0 ]; then
     echo ""
     warn "Firewalld detected. To expose the dashboard on your internal network:"
     echo "  sudo firewall-cmd --permanent --zone=internal --add-port=3000/tcp && sudo firewall-cmd --reload"
