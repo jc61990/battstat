@@ -331,7 +331,11 @@ function parseVarbinds(varbinds, vendor) {
       output_current:   (() => { const v = getInt(OID.tlOutputCurrent);  return v !== null ? Math.round(v / 10) : null; })(),
       self_test_result: (() => { const v = getInt(OID.tlSelfTestResult); return v === 1 ? 'Pass' : v === 2 ? 'Fail' : v === 3 ? 'In Progress' : null; })(),
       self_test_date:   get(OID.tlSelfTestDate) || null,
-      last_xfer_reason: getInt(OID.tlLastXferReason),
+      last_xfer_reason: (() => {
+        const v = getInt(OID.tlLastXferReason);
+        if (v === null || v < 1 || v > 6) return null;
+        return TL_XFER_REASON[v] || null;
+      })(),
       transfer_count:   null, // not available on Tripp Lite NMC5
       // Not saved to poll_results -- used by poller to auto-fill device.battery_installed
       battery_installed_snmp: get(OID.tlLastReplaceDate) || null,
@@ -390,9 +394,19 @@ function parseVarbinds(varbinds, vendor) {
     firmware:         get(OID.apcFirmware),
     input_frequency:  getInt(OID.apcInputFrequency),
     output_current:   getInt(OID.apcOutputCurrent),
-    self_test_result: get(OID.apcSelfTestResult) || null,
-    self_test_date:   get(OID.apcSelfTestDate)   || null,
-    last_xfer_reason: getInt(OID.apcLastXferReason),
+    self_test_result: (() => {
+      const raw = get(OID.apcSelfTestResult);
+      if (raw === null) return null;
+      // Some NMC firmware returns a string ("OK", "Failed", etc.)
+      // Older NMC2 returns an integer: 1=OK, 2=Failed, 3=Invalid/N/A, 4=In progress
+      const n = parseInt(raw, 10);
+      if (!isNaN(n)) {
+        return { 1: 'Pass', 2: 'Fail', 3: null, 4: 'In progress' }[n] ?? null;
+      }
+      return raw || null;
+    })(),
+    self_test_date:   (() => { const v = get(OID.apcSelfTestDate); return (v && v !== 'Unknown' && v !== 'unknown') ? v : null; })(),
+    last_xfer_reason: (() => { const v = getInt(OID.apcLastXferReason); return (v !== null && v >= 1 && v <= 10) ? (APC_XFER_REASON[v] || null) : null; })(),
     transfer_count:   getInt(OID.apcTransferCount),
   };
 }

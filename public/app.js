@@ -1,12 +1,6 @@
 'use strict';
 
 const API = '/api';
-const APC_XFER_REASON = {
-  1:'No events', 2:'High line voltage', 3:'Brownout', 4:'Loss of mains power',
-  5:'Small temporary power drop', 6:'Large temporary power drop',
-  7:'Small spike', 8:'Large spike', 9:'Self test', 10:'Excessive voltage fluctuation',
-};
-
 let state = {
   sites: [],
   devices: [],
@@ -569,7 +563,7 @@ function openDrawer(deviceId) {
       <div class="dp-sec-title">Diagnostics</div>
       <div class="dp-row"><span class="dp-key">Last self test</span><span class="dp-val">${esc(p?.self_test_result || '—')}</span></div>
       <div class="dp-row"><span class="dp-key">Self test date</span><span class="dp-val">${fmtDate(p?.self_test_date) || '—'}</span></div>
-      <div class="dp-row"><span class="dp-key">Last transfer reason</span><span class="dp-val">${p?.last_xfer_reason != null ? (APC_XFER_REASON[p.last_xfer_reason] || 'Reason ' + p.last_xfer_reason) : '—'}</span></div>
+      <div class="dp-row"><span class="dp-key">Last transfer reason</span><span class="dp-val">${esc(p?.last_xfer_reason || '—')}</span></div>
       <div class="dp-row"><span class="dp-key">Transfer count</span><span class="dp-val">${p?.transfer_count != null ? p.transfer_count : '—'}</span></div>
     </div>
 

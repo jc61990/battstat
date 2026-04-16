@@ -57,7 +57,7 @@ db.exec(`
     output_current    INTEGER,
     self_test_result  TEXT,
     self_test_date    TEXT,
-    last_xfer_reason  INTEGER,
+    last_xfer_reason  TEXT,
     transfer_count    INTEGER
   );
 
