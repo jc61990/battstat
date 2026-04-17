@@ -188,7 +188,31 @@ fix_permissions() {
 # -- Systemd -------------------------------------------------------------------
 install_service() {
   info "Installing systemd service..."
-  cp "${APP_DIR}/battstat.service" "$SERVICE_FILE"
+  if [ -f "$SERVICE_FILE" ]; then
+    # Service file already exists -- preserve custom Environment= lines.
+    # Extract current non-default values for HOST, HTTPS, ALLOWED_ORIGIN, DB_PATH, PORT
+    local cur_host cur_https cur_origin cur_db cur_port
+    cur_host=$(grep   "^Environment=HOST="           "$SERVICE_FILE" | cut -d= -f3-)
+    cur_https=$(grep  "^Environment=HTTPS="          "$SERVICE_FILE" | cut -d= -f3-)
+    cur_origin=$(grep "^Environment=ALLOWED_ORIGIN=" "$SERVICE_FILE" | cut -d= -f3-)
+    cur_db=$(grep     "^Environment=DB_PATH="        "$SERVICE_FILE" | cut -d= -f3-)
+    cur_port=$(grep   "^Environment=PORT="           "$SERVICE_FILE" | cut -d= -f3-)
+
+    # Install fresh copy from repo
+    cp "${APP_DIR}/battstat.service" "$SERVICE_FILE"
+
+    # Re-apply preserved values if they were set
+    [ -n "$cur_host" ]   && sed -i "s|^Environment=HOST=.*|Environment=HOST=${cur_host}|"                   "$SERVICE_FILE"
+    [ -n "$cur_https" ]  && sed -i "s|^# Environment=HTTPS=true|Environment=HTTPS=${cur_https}|"            "$SERVICE_FILE"
+    [ -n "$cur_origin" ] && sed -i "s|^# Environment=ALLOWED_ORIGIN=.*|Environment=ALLOWED_ORIGIN=${cur_origin}|" "$SERVICE_FILE"
+    [ -n "$cur_db" ]     && sed -i "s|^Environment=DB_PATH=.*|Environment=DB_PATH=${cur_db}|"               "$SERVICE_FILE"
+    [ -n "$cur_port" ]   && sed -i "s|^Environment=PORT=.*|Environment=PORT=${cur_port}|"                   "$SERVICE_FILE"
+
+    info "Service file updated (custom environment settings preserved)"
+  else
+    cp "${APP_DIR}/battstat.service" "$SERVICE_FILE"
+    info "Service file installed"
+  fi
   systemctl daemon-reload
   systemctl enable "$SERVICE_NAME"
   success "Service installed and enabled"
