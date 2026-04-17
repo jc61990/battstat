@@ -40,6 +40,7 @@ mkdir -p "$DATA_DIR"
 ensure_build_tools
 npm_install
 fix_permissions
+install_service
 
 # -- Optional nginx reverse proxy setup ----------------------------------------
 SETUP_NGINX=0
@@ -61,8 +62,6 @@ fi
 if [ "$SETUP_NGINX" -eq 1 ]; then
   setup_nginx "$NGINX_HOSTNAME"
 fi
-
-install_service
 
 if start_service; then
   header "Installation complete"
