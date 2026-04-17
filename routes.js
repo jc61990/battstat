@@ -129,4 +129,15 @@ router.post('/snmp/config', requirePerm('can_manage_snmp'), (req, res) => {
   } catch (e) { err(res, e.message); }
 });
 
+router.post('/snmp/bulk-version', requirePerm('can_manage_snmp'), (req, res) => {
+  const { version } = req.body;
+  const valid = ['auto', 'v3', 'v2c', 'v1'];
+  if (!valid.includes(version)) return err(res, 'Invalid version');
+  try {
+    const count = db.setAllDevicesSnmpVersion(version);
+    db.auditLog(req.session.username, req.ip, 'BULK_SNMP_VERSION', version, `${count} devices`, true);
+    ok(res, { count });
+  } catch (e) { err(res, e.message); }
+});
+
 module.exports = router;

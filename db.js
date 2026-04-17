@@ -373,6 +373,11 @@ module.exports = {
   // Called by poller when auto-detection finds a working SNMP version.
   // Stores the discovered version so future polls skip the fallback sequence.
   // Only updates if device is currently set to 'auto' -- never overwrites a manual choice.
+  setAllDevicesSnmpVersion(version) {
+    const result = db.prepare("UPDATE devices SET snmp_version=?").run(version);
+    return result.changes;
+  },
+
   setDiscoveredSnmpVersion(deviceId, version) {
     db.prepare("UPDATE devices SET snmp_version=? WHERE id=? AND snmp_version='auto'")
       .run(version, deviceId);

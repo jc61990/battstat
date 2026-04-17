@@ -385,6 +385,21 @@ tr.clickable:hover td{background:var(--bg3)}
           </div>
         </div>
         <div class="info-note">Credentials stored locally in SQLite. Passphrases not shown after saving. All devices share these global credentials.</div>
+
+        <!-- Bulk SNMP version -->
+        <div class="settings-card" style="margin-top:16px" data-perm="can_manage_snmp">
+          <div class="settings-card-title">Bulk SNMP version override</div>
+          <div style="font-size:13px;color:var(--text2);margin-bottom:12px">Set all devices to a specific SNMP version at once. Use <strong>Auto-detect</strong> to reset all devices and let BattStat rediscover the working version on the next poll.</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="bulk-snmp-version" style="width:auto;min-width:220px">
+              <option value="auto">Auto-detect (try v3 → v2c → v1)</option>
+              <option value="v3">SNMPv3 only</option>
+              <option value="v2c">SNMPv2c only</option>
+              <option value="v1">SNMPv1 only</option>
+            </select>
+            <button class="primary" onclick="bulkSetSnmpVersion()">Apply to all devices</button>
+          </div>
+        </div>
       </div>
     </div>
 

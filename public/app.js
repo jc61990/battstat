@@ -603,7 +603,7 @@ function openAddDevice() {
   ['md-name','md-ip','md-floor','md-serial','md-model','md-part','md-batt-date','md-notes'].forEach(id => {
     document.getElementById(id).value = '';
   });
-  document.getElementById('md-snmp-version').value = 'v3';
+  document.getElementById('md-snmp-version').value = 'auto';
   const sel = document.getElementById('md-site');
   sel.innerHTML = state.sites.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
   openModal('modal-device');
@@ -625,7 +625,7 @@ function openEditDevice(id) {
   document.getElementById('md-part').value = d.part_number;
   document.getElementById('md-batt-date').value = d.battery_installed || '';
   document.getElementById('md-notes').value = d.notes;
-  document.getElementById('md-snmp-version').value = d.snmp_version || 'v3';
+  document.getElementById('md-snmp-version').value = d.snmp_version || 'auto';
   openModal('modal-device');
 }
 
@@ -640,7 +640,7 @@ async function saveDevice() {
     part_number: document.getElementById('md-part').value.trim(),
     battery_installed: document.getElementById('md-batt-date').value,
     notes: document.getElementById('md-notes').value.trim(),
-    snmp_version: document.getElementById('md-snmp-version').value || 'v3',
+    snmp_version: document.getElementById('md-snmp-version').value || 'auto',
   };
   if (!body.name || !body.ip || !body.site_id) { toast('Name, IP, and site are required', 'error'); return; }
   try {
@@ -750,7 +750,16 @@ async function loadSnmpConfig() {
   } catch (e) { toast('Failed to load config', 'error'); }
 }
 
-async function saveSnmpConfig() {
+async function bulkSetSnmpVersion() {
+  const version = document.getElementById('bulk-snmp-version').value;
+  const labels = { auto: 'Auto-detect', v3: 'SNMPv3 only', v2c: 'SNMPv2c only', v1: 'SNMPv1 only' };
+  if (!confirm(`Set all devices to "${labels[version]}"? This will override individual device settings.`)) return;
+  try {
+    const result = await apiFetch('/snmp/bulk-version', { method: 'POST', body: { version } });
+    toast(`Updated ${result.count} device${result.count !== 1 ? 's' : ''} to ${labels[version]}`, 'success');
+    await loadAll();
+  } catch (e) { toast(e.message, 'error'); }
+}
   const body = {
     security_name: document.getElementById('cfg-user').value.trim(),
     security_level: document.getElementById('cfg-level').value,
