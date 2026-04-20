@@ -308,6 +308,7 @@ tr.clickable:hover td{background:var(--bg3)}
         <div class="filter-btn" data-f="yellow" onclick="setFilter('yellow',this)">Warning</div>
         <div class="filter-btn" data-f="green" onclick="setFilter('green',this)">Healthy</div>
         <div class="filter-btn" data-f="unreachable" onclick="setFilter('unreachable',this)">Offline</div>
+        <div id="filter-clear-btn" onclick="setFilter('all',this)" style="display:none;padding:5px 12px;border-radius:var(--radius);font-size:12px;cursor:pointer;border:0.5px solid var(--red-border);background:var(--red-bg);color:var(--red-text);white-space:nowrap">✕ Clear filters</div>
         <div class="search-wrap"><input type="text" id="dev-search" placeholder="Search name, IP, serial…" oninput="renderDeviceTable()"></div>
         <select id="site-filter" onchange="renderDeviceTable()" style="max-width:160px"><option value="">All sites</option></select>
       </div>

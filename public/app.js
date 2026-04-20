@@ -7,6 +7,7 @@ let state = {
   polls: {},
   currentPage: 'overview',
   deviceFilter: 'all',
+  deviceFilters: new Set(),
   deviceSort: { col: 'status', dir: 1 },
   editDeviceId: null,
   editSiteId: null,
@@ -42,10 +43,8 @@ function nav(page, filter) {
     n.classList.toggle('active', n.dataset.page === page);
   });
   if (page === 'devices' && filter) {
-    state.deviceFilter = filter;
-    document.querySelectorAll('.filter-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.f === filter);
-    });
+    state.deviceFilters = new Set([filter]);
+    updateFilterButtons();
   }
   if (page === 'devices') renderDeviceTable();
   if (page === 'sites') renderSitesTable();
@@ -353,9 +352,32 @@ function sortBy(col) {
 }
 
 function setFilter(f, el) {
-  state.deviceFilter = f;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+  if (f === 'all') {
+    state.deviceFilters = new Set();
+  } else {
+    if (state.deviceFilters.has(f)) {
+      state.deviceFilters.delete(f);
+    } else {
+      state.deviceFilters.add(f);
+    }
+  }
+  updateFilterButtons();
   renderDeviceTable();
+}
+
+function updateFilterButtons() {
+  const active = state.deviceFilters;
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    const f = b.dataset.f;
+    if (f === 'all') {
+      b.classList.toggle('active', active.size === 0);
+    } else {
+      b.classList.toggle('active', active.has(f));
+    }
+  });
+  // Show/hide clear button
+  const clearBtn = document.getElementById('filter-clear-btn');
+  if (clearBtn) clearBtn.style.display = active.size > 1 ? '' : 'none';
 }
 
 function renderDeviceTable() {
@@ -365,7 +387,7 @@ function renderDeviceTable() {
   let devs = state.devices.filter(d => {
     const p = state.polls[d.id];
     const s = battStatus(p, d);
-    if (state.deviceFilter !== 'all' && s !== state.deviceFilter) return false;
+    if (state.deviceFilters.size > 0 && !state.deviceFilters.has(s)) return false;
     if (siteF && String(d.site_id) !== String(siteF)) return false;
     if (search) {
       const hay = [d.name, d.ip, d.serial, d.model, d.floor,
