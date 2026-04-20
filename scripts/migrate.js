@@ -155,6 +155,12 @@ apply(11, 'add_poll_diagnostics', (db) => {
   if (!cols.includes('transfer_count'))   db.exec('ALTER TABLE poll_results ADD COLUMN transfer_count   INTEGER');
 });
 
+apply(12, 'add_device_auth_protocol_override', (db) => {
+  const cols = db.prepare('PRAGMA table_info(devices)').all().map(c => c.name);
+  if (!cols.includes('auth_protocol')) db.exec('ALTER TABLE devices ADD COLUMN auth_protocol TEXT');
+  if (!cols.includes('priv_protocol')) db.exec('ALTER TABLE devices ADD COLUMN priv_protocol TEXT');
+});
+
 // -- Summary -------------------------------------------------------------------
 const allMigrations = db.prepare('SELECT * FROM schema_migrations ORDER BY version').all();
 console.log(`\n[migrate] ${allMigrations.length} migration(s) recorded in schema_migrations.`);

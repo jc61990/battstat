@@ -32,6 +32,8 @@ db.exec(`
     battery_installed TEXT NOT NULL DEFAULT '',
     notes             TEXT NOT NULL DEFAULT '',
     snmp_version      TEXT NOT NULL DEFAULT 'auto',
+    auth_protocol     TEXT,
+    priv_protocol     TEXT,
     created_at        INTEGER NOT NULL DEFAULT (unixepoch()),
     updated_at        INTEGER NOT NULL DEFAULT (unixepoch())
   );
@@ -381,6 +383,18 @@ module.exports = {
   setDiscoveredSnmpVersion(deviceId, version) {
     db.prepare("UPDATE devices SET snmp_version=? WHERE id=? AND snmp_version='auto'")
       .run(version, deviceId);
+  },
+
+  // Save discovered auth/priv protocol combo. Only saves if device has no override yet.
+  setDiscoveredSnmpAuth(deviceId, authProtocol, privProtocol) {
+    db.prepare("UPDATE devices SET auth_protocol=?, priv_protocol=?, updated_at=unixepoch() WHERE id=? AND auth_protocol IS NULL")
+      .run(authProtocol, privProtocol, deviceId);
+  },
+
+  // Clear a device's discovered auth override so it re-probes on next poll
+  resetSnmpAuth(deviceId) {
+    db.prepare("UPDATE devices SET auth_protocol=NULL, priv_protocol=NULL, updated_at=unixepoch() WHERE id=?")
+      .run(deviceId);
   },
 
   // Reset a device back to auto-detect (called if device stops responding).

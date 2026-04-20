@@ -1,7 +1,7 @@
 'use strict';
 
 const snmp = require('net-snmp');
-const { getDevices, getDevice, getSnmpConfig, savePollResult, pruneOldPolls, autoFillPartNumber, autoFillBatteryInstalled, setDiscoveredSnmpVersion } = require('./db');
+const { getDevices, getDevice, getSnmpConfig, savePollResult, pruneOldPolls, autoFillPartNumber, autoFillBatteryInstalled, setDiscoveredSnmpVersion, setDiscoveredSnmpAuth } = require('./db');
 
 let pollTimer  = null;
 let wsClients  = new Set();
@@ -181,14 +181,27 @@ const TL_XFER_REASON = {
 
 // ── SNMP session builder ──────────────────────────────────────────────────────
 
-function buildSnmpV3Options(cfg) {
-  const authProto = cfg.auth_protocol === 'SHA256'
+// Auth/priv combos to try in order when v3 auth fails.
+// SHA+AES (SHA-1/AES-128) is most common for APC NMC2/NMC3.
+const V3_AUTH_COMBOS = [
+  { auth: 'SHA',    priv: 'AES'    },  // SHA-1 + AES-128 (NMC2, most NMC3)
+  { auth: 'SHA256', priv: 'AES'    },  // SHA-256 + AES-128 (newer NMC3)
+  { auth: 'SHA256', priv: 'AES256' },  // SHA-256 + AES-256
+  { auth: 'SHA512', priv: 'AES'    },  // SHA-512 + AES-128
+  { auth: 'SHA512', priv: 'AES256' },  // SHA-512 + AES-256
+];
+
+function buildSnmpV3Options(cfg, authOverride, privOverride) {
+  const authStr = authOverride || cfg.auth_protocol;
+  const privStr = privOverride || cfg.priv_protocol;
+
+  const authProto = authStr === 'SHA256'
     ? snmp.AuthProtocols.sha256
-    : cfg.auth_protocol === 'SHA512'
+    : authStr === 'SHA512'
       ? snmp.AuthProtocols.sha512
       : snmp.AuthProtocols.sha;
 
-  const privProto = cfg.priv_protocol === 'AES256'
+  const privProto = privStr === 'AES256'
     ? snmp.PrivProtocols.aes256b
     : snmp.PrivProtocols.aes;
 
@@ -413,7 +426,7 @@ function parseVarbinds(varbinds, vendor) {
 
 // ── SNMP session factory ──────────────────────────────────────────────────────
 
-function createSnmpSession(device, cfg, version) {
+function createSnmpSession(device, cfg, version, authOverride, privOverride) {
   const vendor = detectVendor(device);
   if (version === 'v1' || version === 'v2c') {
     const snmpVer = version === 'v1' ? snmp.Version1 : snmp.Version2c;
@@ -424,17 +437,17 @@ function createSnmpSession(device, cfg, version) {
       retries:  cfg.retries   ?? 1,
     });
   }
-  // v3
-  const { sessionOpts, userOpts } = buildSnmpV3Options(cfg);
+  // v3 -- use per-device auth override if set
+  const { sessionOpts, userOpts } = buildSnmpV3Options(cfg, authOverride, privOverride);
   if (vendor === 'tripplite') sessionOpts.context = '';
   return snmp.createV3Session(device.ip, userOpts, sessionOpts);
 }
 
-function trySnmpGet(device, cfg, oids, version) {
+function trySnmpGet(device, cfg, oids, version, authOverride, privOverride) {
   return new Promise((resolve) => {
     let session;
     try {
-      session = createSnmpSession(device, cfg, version);
+      session = createSnmpSession(device, cfg, version, authOverride, privOverride);
     } catch (err) {
       resolve({ ok: false, error: err.message });
       return;
@@ -464,43 +477,69 @@ async function pollDevice(device, cfg) {
   }
 
   for (const version of versions) {
-    const result = await trySnmpGet(device, cfg, oids, version);
+    // For v3, use per-device auth override if saved, otherwise try all combos on auth error
+    const authCombos = (version === 'v3' && device.auth_protocol && device.priv_protocol)
+      ? [{ auth: device.auth_protocol, priv: device.priv_protocol }]
+      : version === 'v3'
+        ? V3_AUTH_COMBOS
+        : [{ auth: null, priv: null }];
 
-    if (result.ok) {
-      // Success -- if we were in auto mode and had to fall back, save the discovered version
-      if (setting === 'auto' && version !== 'v3') {
-        setDiscoveredSnmpVersion(device.id, version);
-        console.log(`[poller] ${device.name}: discovered SNMP ${version}, saved for future polls`);
+    for (const combo of authCombos) {
+      const result = await trySnmpGet(device, cfg, oids, version, combo.auth, combo.priv);
+
+      if (result.ok) {
+        // Save discovered SNMP version if auto-detected fallback
+        if (setting === 'auto' && version !== 'v3') {
+          setDiscoveredSnmpVersion(device.id, version);
+          console.log(`[poller] ${device.name}: discovered SNMP ${version}, saved for future polls`);
+        }
+        // Save discovered auth combo if we had to probe (only for v3, only if not already saved)
+        if (version === 'v3' && !device.auth_protocol && combo.auth) {
+          const isDefault = combo.auth === (cfg.auth_protocol || 'SHA') && combo.priv === (cfg.priv_protocol || 'AES');
+          if (!isDefault) {
+            setDiscoveredSnmpAuth(device.id, combo.auth, combo.priv);
+            console.log(`[poller] ${device.name}: discovered auth ${combo.auth}/${combo.priv}, saved for future polls`);
+          }
+        }
+        try {
+          return { reachable: true, ...parseVarbinds(result.varbinds, vendor) };
+        } catch (parseErr) {
+          return { reachable: false, raw_error: 'Parse error: ' + parseErr.message };
+        }
       }
-      try {
-        return { reachable: true, ...parseVarbinds(result.varbinds, vendor) };
-      } catch (parseErr) {
-        return { reachable: false, raw_error: 'Parse error: ' + parseErr.message };
+
+      // Check error type
+      const isAuthError = result.error && (
+        result.error.includes('Wrong Digest') ||
+        result.error.includes('Unknown User Name') ||
+        result.error.includes('Unknown Security Name') ||
+        result.error.includes('Authorization Error') ||
+        result.error.includes('Authentication')
+      );
+
+      const isTimeout = !isAuthError;
+
+      // Timeouts -- device unreachable, stop immediately
+      if (isTimeout) {
+        return { reachable: false, raw_error: result.error };
       }
+
+      // Auth error -- try next combo if we have one
+      if (combo !== authCombos[authCombos.length - 1]) {
+        console.log(`[poller] ${device.name}: v3 auth ${combo.auth}/${combo.priv} failed, trying next combo...`);
+        continue;
+      }
+
+      // All auth combos exhausted for this version -- try next version (v2c/v1)
+      const isLastVersion = version === versions[versions.length - 1];
+      if (isLastVersion) {
+        return { reachable: false, raw_error: result.error };
+      }
+      console.log(`[poller] ${device.name}: SNMP ${version} auth failed, trying fallback...`);
     }
-
-    // Only fall back on authentication/access errors.
-    // Timeouts mean the device is unreachable -- no point trying other versions.
-    const isAuthError = result.error && (
-      result.error.includes('Wrong Digest') ||
-      result.error.includes('Unknown User Name') ||
-      result.error.includes('Unknown Security Name') ||
-      result.error.includes('Authorization Error') ||
-      result.error.includes('Authentication')
-    );
-
-    const isLastVersion = version === versions[versions.length - 1];
-
-    if (isLastVersion || !isAuthError) {
-      // Timeout or last fallback -- give up
-      return { reachable: false, raw_error: result.error };
-    }
-
-    // Auth error on v3 -- worth trying v2c/v1 since credentials differ
-    console.log(`[poller] ${device.name}: SNMP ${version} auth failed, trying fallback...`);
   }
 
-  return { reachable: false, raw_error: 'All SNMP versions failed' };
+  return { reachable: false, raw_error: 'All SNMP versions and auth combos failed' };
 }
 
 // ── Poll cycle ────────────────────────────────────────────────────────────────

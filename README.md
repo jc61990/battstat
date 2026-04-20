@@ -4,6 +4,9 @@ Self-hosted UPS battery health dashboard. Polls UPS devices via SNMP, displays l
 
 **Current version: 1.3.0**
 
+![BattStat Overview](docs/screenshot-overview.png)
+![BattStat Device Detail](docs/screenshot-device.png)
+
 ---
 
 ## Features
