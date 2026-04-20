@@ -486,7 +486,7 @@ function openDrawer(deviceId) {
     : null;
 
   document.getElementById('dr-title').textContent = d.name;
-  document.getElementById('dr-sub').textContent = (p?.model_snmp || d.model || 'Unknown model') + ' · ' + (site?.name || '');
+  document.getElementById('dr-sub').innerHTML = `${esc(p?.model_snmp || d.model || 'Unknown model')} · ${esc(site?.name || '')} · <a href="https://${esc(d.ip)}" target="_blank" rel="noopener" style="color:var(--blue);font-family:monospace;font-size:11px">${esc(d.ip)} ↗</a>`;
 
   const progColor = lifePct !== null ? (lifePct > 50 ? '#639922' : lifePct > 20 ? '#ef9f27' : '#e24b4a') : '#888';
   const chargeColor = p?.batt_capacity > 50 ? '#639922' : p?.batt_capacity > 25 ? '#ef9f27' : '#e24b4a';
