@@ -19,7 +19,10 @@ function setSessionCookie(res, token, expiresAt, persistent) {
   const secure = process.env.HTTPS === 'true';
   const opts = {
     httpOnly: true,
-    sameSite: 'Strict',
+    // Lax (not Strict) -- Strict causes browsers to withhold the cookie on
+    // WebSocket upgrade requests, breaking the live update connection after login.
+    // Lax still protects against CSRF for state-changing requests.
+    sameSite: 'Lax',
     path:     '/',
     secure,
     ...(maxAge ? { maxAge: maxAge * 1000 } : {}),
