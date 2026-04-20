@@ -760,6 +760,8 @@ async function bulkSetSnmpVersion() {
     await loadAll();
   } catch (e) { toast(e.message, 'error'); }
 }
+
+async function saveSnmpConfig() {
   const body = {
     security_name: document.getElementById('cfg-user').value.trim(),
     security_level: document.getElementById('cfg-level').value,
