@@ -409,6 +409,7 @@ function renderDeviceTable() {
       case 'batt': av = pa?.batt_capacity ?? -1; bv = pb?.batt_capacity ?? -1; break;
       case 'temp': av = pa?.batt_temperature ?? -1; bv = pb?.batt_temperature ?? -1; break;
       case 'runtime': av = pa?.batt_run_time ?? -1; bv = pb?.batt_run_time ?? -1; break;
+      case 'ip': av = a.ip.split('.').map(n=>n.padStart(3,'0')).join('.'); bv = b.ip.split('.').map(n=>n.padStart(3,'0')).join('.'); break;
       case 'replace': av = a.battery_installed || 'z'; bv = b.battery_installed || 'z'; break;
       case 'model': av = (pa?.model_snmp || a.model || '').toLowerCase(); bv = (pb?.model_snmp || b.model || '').toLowerCase(); break;
       default: return 0;
