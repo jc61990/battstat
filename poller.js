@@ -307,11 +307,11 @@ function parseVarbinds(varbinds, vendor) {
       batt_status = TL_BATT_STATUS[rfcSi] || String(rfcSi);
     }
 
-    // Runtime: LX Platform in seconds, RFC 1628 in TimeTicks (hundredths of a second)
+    // Runtime: NMC5 LX Platform returns minutes directly. RFC 1628 returns TimeTicks (hundredths of a second).
     const tlRt  = getInt(OID.tlBattRunTime);
     const rfcRt = getInt(OID.rfc1628BattRunTime);
     const batt_run_time = tlRt !== null
-      ? Math.floor(tlRt / 60)
+      ? tlRt
       : rfcRt !== null ? Math.floor(rfcRt / 6000) : null;
 
     // Temperature: NMC5 returns tenths of Fahrenheit (599 = 59.9F = 15.5C)
