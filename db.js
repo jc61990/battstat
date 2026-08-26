@@ -188,6 +188,8 @@ db.exec(`
     alerted_status  TEXT,
     last_alerted_at INTEGER
   );
+
+  CREATE TABLE IF NOT EXISTS audit_log (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
     ts       INTEGER NOT NULL DEFAULT (unixepoch()),
     username TEXT NOT NULL DEFAULT '',
