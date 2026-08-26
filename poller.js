@@ -2,6 +2,7 @@
 
 const snmp = require('net-snmp');
 const { getDevices, getDevice, getSnmpConfig, savePollResult, pruneOldPolls, autoFillPartNumber, autoFillBatteryInstalled, setDiscoveredSnmpVersion, setDiscoveredSnmpAuth } = require('./db');
+const { runAlertCheck } = require('./alerter');
 
 let pollTimer  = null;
 let wsClients  = new Set();
@@ -567,6 +568,7 @@ async function runPollCycle() {
     }
     broadcast('poll_complete', results);
     pruneOldPolls(30);
+    runAlertCheck(results).catch(e => console.error('[alerter]', e.message));
   } catch (err) {
     console.error('[poller] Cycle error:', err.message);
   } finally {

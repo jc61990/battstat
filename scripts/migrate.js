@@ -161,6 +161,33 @@ apply(12, 'add_device_auth_protocol_override', (db) => {
   if (!cols.includes('priv_protocol')) db.exec('ALTER TABLE devices ADD COLUMN priv_protocol TEXT');
 });
 
+apply(13, 'add_alerting', (db) => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS alert_config (
+      id              INTEGER PRIMARY KEY DEFAULT 1,
+      enabled         INTEGER NOT NULL DEFAULT 0,
+      smtp_host       TEXT NOT NULL DEFAULT '',
+      smtp_port       INTEGER NOT NULL DEFAULT 587,
+      smtp_secure     INTEGER NOT NULL DEFAULT 0,
+      smtp_user       TEXT NOT NULL DEFAULT '',
+      smtp_pass       TEXT NOT NULL DEFAULT '',
+      smtp_from       TEXT NOT NULL DEFAULT '',
+      recipients      TEXT NOT NULL DEFAULT '',
+      alert_critical  INTEGER NOT NULL DEFAULT 1,
+      alert_warning   INTEGER NOT NULL DEFAULT 1,
+      alert_offline   INTEGER NOT NULL DEFAULT 1,
+      reminder_hours  INTEGER NOT NULL DEFAULT 24
+    );
+    INSERT OR IGNORE INTO alert_config (id) VALUES (1);
+    CREATE TABLE IF NOT EXISTS alert_state (
+      device_id       INTEGER PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
+      last_status     TEXT NOT NULL DEFAULT 'green',
+      alerted_status  TEXT,
+      last_alerted_at INTEGER
+    );
+  `);
+});
+
 // -- Summary -------------------------------------------------------------------
 const allMigrations = db.prepare('SELECT * FROM schema_migrations ORDER BY version').all();
 console.log(`\n[migrate] ${allMigrations.length} migration(s) recorded in schema_migrations.`);

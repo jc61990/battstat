@@ -48,7 +48,7 @@ function nav(page, filter) {
   }
   if (page === 'devices') renderDeviceTable();
   if (page === 'sites') renderSitesTable();
-  if (page === 'settings') loadSnmpConfig();
+  if (page === 'settings') { loadSnmpConfig(); loadAlertConfig(); }
   if (page === 'users') { if(typeof loadAdminData==='function'){loadAdminData();loadLdapConfig();} }
   if (page === 'audit') { if(typeof loadAuditLog==='function') loadAuditLog(); }
 }
@@ -783,6 +783,53 @@ async function bulkSetSnmpVersion() {
     toast(`Updated ${result.count} device${result.count !== 1 ? 's' : ''} to ${labels[version]}`, 'success');
     await loadAll();
   } catch (e) { toast(e.message, 'error'); }
+}
+
+async function loadAlertConfig() {
+  try {
+    const cfg = await apiFetch('/alert/config');
+    document.getElementById('alert-enabled').checked       = !!cfg.enabled;
+    document.getElementById('alert-smtp-host').value       = cfg.smtp_host || '';
+    document.getElementById('alert-smtp-port').value       = cfg.smtp_port || 587;
+    document.getElementById('alert-smtp-secure').checked   = !!cfg.smtp_secure;
+    document.getElementById('alert-smtp-user').value       = cfg.smtp_user || '';
+    document.getElementById('alert-smtp-pass').value       = '';
+    document.getElementById('alert-smtp-from').value       = cfg.smtp_from || '';
+    document.getElementById('alert-recipients').value      = cfg.recipients || '';
+    document.getElementById('alert-critical').checked      = !!cfg.alert_critical;
+    document.getElementById('alert-warning').checked       = !!cfg.alert_warning;
+    document.getElementById('alert-offline').checked       = !!cfg.alert_offline;
+    document.getElementById('alert-reminder-hours').value  = cfg.reminder_hours || 24;
+  } catch (e) { toast('Failed to load alert config', 'error'); }
+}
+
+async function saveAlertConfig() {
+  const body = {
+    enabled:        document.getElementById('alert-enabled').checked,
+    smtp_host:      document.getElementById('alert-smtp-host').value.trim(),
+    smtp_port:      parseInt(document.getElementById('alert-smtp-port').value) || 587,
+    smtp_secure:    document.getElementById('alert-smtp-secure').checked,
+    smtp_user:      document.getElementById('alert-smtp-user').value.trim(),
+    smtp_pass:      document.getElementById('alert-smtp-pass').value,
+    smtp_from:      document.getElementById('alert-smtp-from').value.trim(),
+    recipients:     document.getElementById('alert-recipients').value.trim(),
+    alert_critical: document.getElementById('alert-critical').checked,
+    alert_warning:  document.getElementById('alert-warning').checked,
+    alert_offline:  document.getElementById('alert-offline').checked,
+    reminder_hours: parseInt(document.getElementById('alert-reminder-hours').value) || 24,
+  };
+  try {
+    await apiFetch('/alert/config', { method: 'POST', body });
+    toast('Alert settings saved', 'success');
+    document.getElementById('alert-smtp-pass').value = '';
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function testAlertSmtp() {
+  try {
+    await apiFetch('/alert/test', { method: 'POST', body: {} });
+    toast('Test email sent — check your inbox', 'success');
+  } catch (e) { toast('Test failed: ' + e.message, 'error'); }
 }
 
 async function saveSnmpConfig() {

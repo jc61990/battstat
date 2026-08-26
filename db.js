@@ -164,7 +164,30 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_user_site_access_user ON user_site_access(user_id);
 
-  CREATE TABLE IF NOT EXISTS audit_log (
+  CREATE TABLE IF NOT EXISTS alert_config (
+    id              INTEGER PRIMARY KEY DEFAULT 1,
+    enabled         INTEGER NOT NULL DEFAULT 0,
+    smtp_host       TEXT NOT NULL DEFAULT '',
+    smtp_port       INTEGER NOT NULL DEFAULT 587,
+    smtp_secure     INTEGER NOT NULL DEFAULT 0,
+    smtp_user       TEXT NOT NULL DEFAULT '',
+    smtp_pass       TEXT NOT NULL DEFAULT '',
+    smtp_from       TEXT NOT NULL DEFAULT '',
+    recipients      TEXT NOT NULL DEFAULT '',
+    alert_critical  INTEGER NOT NULL DEFAULT 1,
+    alert_warning   INTEGER NOT NULL DEFAULT 1,
+    alert_offline   INTEGER NOT NULL DEFAULT 1,
+    reminder_hours  INTEGER NOT NULL DEFAULT 24
+  );
+
+  INSERT OR IGNORE INTO alert_config (id) VALUES (1);
+
+  CREATE TABLE IF NOT EXISTS alert_state (
+    device_id       INTEGER PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
+    last_status     TEXT NOT NULL DEFAULT 'green',
+    alerted_status  TEXT,
+    last_alerted_at INTEGER
+  );
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
     ts       INTEGER NOT NULL DEFAULT (unixepoch()),
     username TEXT NOT NULL DEFAULT '',
@@ -443,6 +466,42 @@ module.exports = {
     db.prepare(
       "UPDATE devices SET battery_installed=?, updated_at=unixepoch() WHERE id=? AND (battery_installed IS NULL OR battery_installed='')"
     ).run(dateStr, deviceId);
+  },
+
+  // ── Alerting ────────────────────────────────────────────────────────────────
+  getAlertConfig() {
+    return db.prepare('SELECT * FROM alert_config WHERE id=1').get();
+  },
+  saveAlertConfig(cfg) {
+    db.prepare(`UPDATE alert_config SET
+      enabled=?,smtp_host=?,smtp_port=?,smtp_secure=?,smtp_user=?,smtp_pass=?,
+      smtp_from=?,recipients=?,alert_critical=?,alert_warning=?,alert_offline=?,reminder_hours=?
+      WHERE id=1`).run(
+      cfg.enabled?1:0, cfg.smtp_host||'', cfg.smtp_port||587, cfg.smtp_secure?1:0,
+      cfg.smtp_user||'',
+      // preserve existing password if placeholder sent
+      (cfg.smtp_pass && cfg.smtp_pass !== '********') ? cfg.smtp_pass : db.prepare('SELECT smtp_pass FROM alert_config WHERE id=1').get()?.smtp_pass || '',
+      cfg.smtp_from||'', cfg.recipients||'',
+      cfg.alert_critical?1:0, cfg.alert_warning?1:0, cfg.alert_offline?1:0,
+      cfg.reminder_hours||24
+    );
+    return this.getAlertConfig();
+  },
+  getAlertState(deviceId) {
+    return db.prepare('SELECT * FROM alert_state WHERE device_id=?').get(deviceId);
+  },
+  upsertAlertState(deviceId, status) {
+    db.prepare(`INSERT INTO alert_state (device_id, last_status) VALUES (?,?)
+      ON CONFLICT(device_id) DO UPDATE SET last_status=excluded.last_status`)
+      .run(deviceId, status);
+  },
+  markAlerted(deviceId, status) {
+    db.prepare(`INSERT INTO alert_state (device_id, last_status, alerted_status, last_alerted_at) VALUES (?,?,?,unixepoch())
+      ON CONFLICT(device_id) DO UPDATE SET alerted_status=excluded.alerted_status, last_alerted_at=unixepoch()`)
+      .run(deviceId, status, status);
+  },
+  clearAlertState(deviceId) {
+    db.prepare('UPDATE alert_state SET alerted_status=NULL, last_alerted_at=NULL WHERE device_id=?').run(deviceId);
   },
 
   auditLog(username, ip, action, target, detail, success=true) {

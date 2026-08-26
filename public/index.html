@@ -401,10 +401,58 @@ tr.clickable:hover td{background:var(--bg3)}
             <button class="primary" onclick="bulkSetSnmpVersion()">Apply to all devices</button>
           </div>
         </div>
+
+        <!-- Email alerting -->
+        <div class="settings-card" style="margin-top:16px" data-perm="can_manage_snmp">
+          <div class="settings-card-title">Email Alerting</div>
+          <div style="font-size:13px;color:var(--text2);margin-bottom:14px">Send email notifications when devices go critical, warning, or offline. Alerts fire on status change and repeat as a reminder while the condition persists.</div>
+
+          <div class="form-row" style="display:flex;align-items:center;gap:8px;padding-bottom:10px;margin-bottom:10px;border-bottom:0.5px solid var(--border)">
+            <input type="checkbox" id="alert-enabled">
+            <label for="alert-enabled" style="margin:0;font-weight:400;cursor:pointer">Enable email alerting</label>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div class="form-row"><label>SMTP host</label><input type="text" id="alert-smtp-host" placeholder="smtp.office365.com"></div>
+            <div class="form-row"><label>SMTP port</label><input type="number" id="alert-smtp-port" value="587" min="1" max="65535"></div>
+            <div class="form-row"><label>Username</label><input type="text" id="alert-smtp-user" placeholder="alerts@company.com" autocomplete="off"></div>
+            <div class="form-row"><label>Password</label><input type="password" id="alert-smtp-pass" placeholder="Leave blank to keep current" autocomplete="new-password"></div>
+            <div class="form-row"><label>From address</label><input type="text" id="alert-smtp-from" placeholder="BattStat &lt;alerts@company.com&gt;"></div>
+            <div class="form-row" style="display:flex;align-items:center;gap:8px;padding-top:20px">
+              <input type="checkbox" id="alert-smtp-secure">
+              <label for="alert-smtp-secure" style="margin:0;font-weight:400;cursor:pointer">Use TLS (port 465)</label>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-bottom:10px">
+            <label>Recipients</label>
+            <input type="text" id="alert-recipients" placeholder="user@company.com, ops@company.com">
+            <div style="font-size:11px;color:var(--text3);margin-top:3px">Comma-separated list of email addresses</div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div>
+              <label style="display:block;margin-bottom:6px">Alert on</label>
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-critical"> Critical status</label>
+                <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-warning"> Warning status</label>
+                <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-offline"> Device offline</label>
+              </div>
+            </div>
+            <div class="form-row">
+              <label>Reminder interval (hours)</label>
+              <input type="number" id="alert-reminder-hours" value="24" min="1" max="168">
+              <div style="font-size:11px;color:var(--text3);margin-top:3px">Resend alert if condition persists</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button class="primary" onclick="saveAlertConfig()">Save alert settings</button>
+            <button onclick="testAlertSmtp()">Send test email</button>
+          </div>
+        </div>
       </div>
     </div>
-
-    <!-- USERS & ROLES PAGE -->
     <div class="page" id="page-users">
       <div class="page-header">
         <div><div class="page-title">Users &amp; Roles</div><div class="page-sub">Manage local accounts, Active Directory integration, and role permissions</div></div>

@@ -140,4 +140,28 @@ router.post('/snmp/bulk-version', requirePerm('can_manage_snmp'), (req, res) => 
   } catch (e) { err(res, e.message); }
 });
 
+// ── Alert config ──────────────────────────────────────────────────────────────
+router.get('/alert/config', requirePerm('can_manage_snmp'), (req, res) => {
+  const cfg = db.getAlertConfig();
+  ok(res, { ...cfg, smtp_pass: cfg.smtp_pass ? '********' : '' });
+});
+
+router.post('/alert/config', requirePerm('can_manage_snmp'), async (req, res) => {
+  try {
+    const saved = db.saveAlertConfig(req.body);
+    db.auditLog(req.session.username, req.ip, 'UPDATE_ALERT_CONFIG', 'alert', '', true);
+    ok(res, { ...saved, smtp_pass: saved.smtp_pass ? '********' : '' });
+  } catch (e) { err(res, e.message); }
+});
+
+router.post('/alert/test', requirePerm('can_manage_snmp'), async (req, res) => {
+  try {
+    const { testSmtp } = require('./mailer');
+    const cfg = db.getAlertConfig();
+    if (!cfg.smtp_host) return err(res, 'SMTP not configured');
+    await testSmtp(cfg);
+    ok(res, { message: 'Test email sent' });
+  } catch (e) { err(res, e.message); }
+});
+
 module.exports = router;

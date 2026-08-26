@@ -14,6 +14,7 @@
     "helmet": "^8.0.0",
     "ldapjs": "^3.0.7",
     "net-snmp": "^3.26.1",
+    "nodemailer": "^9.0.5",
     "ws": "^8.18.1"
   },
   "engines": {
