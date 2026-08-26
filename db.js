@@ -165,7 +165,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_user_site_access_user ON user_site_access(user_id);
 
   CREATE TABLE IF NOT EXISTS alert_config (
-    id              INTEGER PRIMARY KEY DEFAULT 1,
+    id              INTEGER PRIMARY KEY,
     enabled         INTEGER NOT NULL DEFAULT 0,
     smtp_host       TEXT NOT NULL DEFAULT '',
     smtp_port       INTEGER NOT NULL DEFAULT 587,

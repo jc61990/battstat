@@ -164,7 +164,7 @@ apply(12, 'add_device_auth_protocol_override', (db) => {
 apply(13, 'add_alerting', (db) => {
   db.exec(`
     CREATE TABLE IF NOT EXISTS alert_config (
-      id              INTEGER PRIMARY KEY DEFAULT 1,
+      id              INTEGER PRIMARY KEY,
       enabled         INTEGER NOT NULL DEFAULT 0,
       smtp_host       TEXT NOT NULL DEFAULT '',
       smtp_port       INTEGER NOT NULL DEFAULT 587,
