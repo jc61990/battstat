@@ -1,24 +1,24 @@
 # BattStat
 
-Self-hosted UPS battery health dashboard. Polls UPS devices via SNMP, displays live battery status, runtime, power readings, and diagnostic data. Supports multi-site management, role-based access control with per-role site restrictions, local users, and LDAP / Active Directory authentication.
+Self-hosted UPS battery health dashboard. Polls UPS devices via SNMP, displays live battery status, runtime, power readings, and diagnostic data. Supports multi-site management, role-based access control with per-role site restrictions, local users, LDAP / Active Directory authentication, and email alerting.
 
-**Current version: 1.3.0**
-
-![BattStat Overview](docs/screenshot-overview.png)
-![BattStat Device Detail](docs/screenshot-device.png)
+**Current version: 1.4.0**
 
 ---
 
 ## Features
 
 - **SNMP auto-detection** — tries SNMPv3 first, falls back to v2c/v1 on auth errors only. Saves working version per device
+- **SNMPv3 auth auto-detection** — cycles through SHA/AES combinations (SHA-1, SHA-256, SHA-512 × AES-128, AES-256) per device until one works, saves the result
 - **Multi-vendor support** — APC, Eaton/Powerware, CyberPower, Tripp Lite NMC5/PADM20
 - **Live updates** — WebSocket push, no page refresh needed
 - **Multi-site** — group devices by physical location, filter dashboard by site
 - **Role-based access** — custom roles with per-permission and per-site restrictions (works for LDAP users)
 - **LDAP/AD auth** — no domain join required; maps AD groups to roles
+- **Email alerting** — SMTP alerts on critical/warning/offline status changes, with configurable reminder interval
 - **Battery part number auto-fill** — looks up replacement part from SNMP model string
 - **Battery install date auto-fill** — reads last-replaced date from Tripp Lite NMC5 via SNMP
+- **Device drawer** — click any device for full detail: power readings, diagnostics, self-test, transfer history, IP link
 - **Dark mode** — manual toggle, persists across sessions
 - **nginx reverse proxy** — optional HTTPS setup with self-signed cert, fully automated from installer
 - **Git-based upgrades** — single command, auto-backup with 5-backup retention, DB migrations automatic
@@ -32,6 +32,7 @@ Self-hosted UPS battery health dashboard. Polls UPS devices via SNMP, displays l
 - Network access to UPS devices on UDP 161
 - UPS NMC with SNMP enabled (SNMPv3 recommended, v2c/v1 supported)
 - For LDAP/AD: service account with read access to your directory
+- For email alerting: SMTP relay or mail account (Office 365, Gmail, internal relay)
 
 ---
 
@@ -56,7 +57,7 @@ After install the dashboard is at `http://<server-ip>:3000` (or `https://<hostna
 ## First-time setup
 
 ### 1. Configure SNMP
-Go to **SNMP Settings** and enter your SNMPv3 credentials. Set the community string for any v2c/v1 devices.
+Go to **SNMP Settings** and enter your SNMPv3 credentials. Set the community string for any v2c/v1 devices. Use **Bulk SNMP version override** to reset all devices to Auto-detect if needed.
 
 ### 2. Add sites and devices
 - **Sites** → **+ Add Site**
@@ -67,12 +68,26 @@ The **Model hint** field drives vendor detection — include `apc`, `eaton`, `cy
 ### 3. Configure LDAP (optional)
 **Users & Roles** → **LDAP / Active Directory**. UPN format (`user@domain.com`) works for Bind DN. Use the Test button to verify. Map AD groups to roles in the Group Mappings tab.
 
+### 4. Configure email alerting (optional)
+**Alerting** (Admin section) → enter SMTP settings, recipients, and choose which conditions trigger alerts.
+
 ---
 
 ## SNMP support
 
 ### Version auto-detection
-Auto mode tries v3 first, then v2c, then v1 — but **only falls back on authentication errors** (wrong credentials, unknown user). Timeouts mean the device is unreachable; no fallback is attempted. Once a working version is discovered it is saved to the device record.
+Auto mode tries v3 first, then v2c, then v1 — **only falls back on authentication errors**, not timeouts. Timeouts mean the device is unreachable; no fallback is attempted. Once a working version is discovered it is saved to the device record.
+
+### SNMPv3 auth auto-detection
+When a device fails v3 auth, BattStat cycles through these combinations in order and saves the working one:
+
+| # | Auth | Priv | Common use |
+|---|---|---|---|
+| 1 | SHA (SHA-1) | AES (AES-128) | APC NMC2, most NMC3 |
+| 2 | SHA-256 | AES-128 | Newer NMC3 firmware |
+| 3 | SHA-256 | AES-256 | NMC3 latest |
+| 4 | SHA-512 | AES-128 | Rare |
+| 5 | SHA-512 | AES-256 | Rare |
 
 ### OID coverage by vendor
 
@@ -122,14 +137,34 @@ Search filter: (sAMAccountName={{username}})
 | `can_view` | View dashboard and poll data |
 | `can_edit_devices` | Add, edit, delete devices |
 | `can_manage_sites` | Add, edit, delete sites — also bypasses site restrictions |
-| `can_manage_users` | Manage users, roles, LDAP config, audit log |
+| `can_manage_users` | Manage users, roles, LDAP config, audit log, alerting |
 | `can_manage_snmp` | View and edit SNMP settings |
 | `can_poll` | Trigger manual on-demand polls |
 
 System roles (read-only): **Administrator** (all permissions), **Viewer** (`can_view` only).
 
 ### Per-role site access
-Roles can be restricted to specific sites. Any user (local or LDAP) with that role only sees devices and data from those sites — enforced server-side. Roles with `can_manage_sites` always see everything. Empty site list = unrestricted.
+Roles can be restricted to specific sites. Any user (local or LDAP) with that role only sees devices and data from those sites — enforced server-side on every API request. Roles with `can_manage_sites` always see everything. Empty site list = unrestricted.
+
+---
+
+## Email alerting
+
+Configured under **Alerting** in the Admin section (requires Administrator role).
+
+**Alert conditions:**
+- Device status changes to Critical
+- Device status changes to Warning
+- Device goes offline (unreachable)
+
+**Behavior:**
+- Alert fires immediately on status change
+- Reminder fires after the configured interval (default 24h) if the condition persists
+- Alert state clears automatically when the device recovers
+
+**SMTP settings:** host, port, username, password, from address, TLS toggle. Use **Send test email** to verify before enabling.
+
+**Recipients:** comma-separated list of email addresses.
 
 ---
 
@@ -212,12 +247,12 @@ Set in `/etc/systemd/system/battstat.service`:
 ## Upgrading
 
 ```bash
-cd /opt/battstat-src
+cd /path/to/battstat-source
 sudo git pull
 sudo bash upgrade.sh
 ```
 
-Backs up the database (keeps 5 most recent), stops the service, syncs files, runs `npm install`, runs DB migrations, restarts. Rolls back automatically on failure.
+Backs up the database (keeps 5 most recent), stops the service, syncs files, runs `npm install`, runs DB migrations, restarts. Custom environment settings (HOST, HTTPS, ALLOWED_ORIGIN) are preserved automatically. Rolls back on failure.
 
 ---
 
@@ -236,6 +271,15 @@ sudo bash /opt/battstat/uninstall.sh --purge     # uninstall + delete DB
 
 ## Changelog
 
+### 1.4.0
+- Email alerting via SMTP — alerts on critical/warning/offline status changes with configurable reminders
+- Alerting page in Admin section (Administrator only)
+- SNMPv3 auth/priv protocol auto-detection — cycles through SHA/AES combinations per device, saves working combo
+- Multi-select device filters — click multiple status buttons to combine filters, clear button appears with 2+ active
+- Sort by Runtime and IP address in device table
+- Device drawer: clickable IP link opens device web interface in new tab
+- Tripp Lite runtime fix: NMC5 returns minutes directly, was incorrectly dividing by 60
+
 ### 1.3.0
 - Extended device drawer: input frequency, output current, self-test result/date, last transfer reason, transfer count
 - Per-role site access — replaces per-user site access, works for LDAP users via group→role mapping
@@ -243,7 +287,7 @@ sudo bash /opt/battstat/uninstall.sh --purge     # uninstall + delete DB
 - Dark mode toggle with localStorage persistence
 - SNMPv1/v2c support with community string configuration
 - Auto-detect SNMP version per device (v3 → v2c → v1, auth errors only, not timeouts)
-- nginx HTTPS reverse proxy setup automated in installer — prompted during install
+- nginx HTTPS reverse proxy setup automated in installer
 - Backup pruning: keeps 5 most recent
 - Backup version label shows git commit subject line
 - Overview: Sites moved above Attention Required
