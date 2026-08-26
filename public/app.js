@@ -48,7 +48,8 @@ function nav(page, filter) {
   }
   if (page === 'devices') renderDeviceTable();
   if (page === 'sites') renderSitesTable();
-  if (page === 'settings') { loadSnmpConfig(); loadAlertConfig(); }
+  if (page === 'settings') loadSnmpConfig();
+  if (page === 'alerting') loadAlertConfig();
   if (page === 'users') { if(typeof loadAdminData==='function'){loadAdminData();loadLdapConfig();} }
   if (page === 'audit') { if(typeof loadAuditLog==='function') loadAuditLog(); }
 }
