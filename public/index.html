@@ -278,23 +278,6 @@ tr.clickable:hover td{background:var(--bg3)}
 
   <main class="main">
 
-    <!-- NOTIFICATION BELL -->
-    <div id="notif-bell-wrap" style="position:fixed;top:14px;right:18px;z-index:200">
-      <button id="notif-bell-btn" onclick="toggleNotifDropdown()" style="position:relative;background:var(--bg2);border:0.5px solid var(--border2);border-radius:8px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:15px">
-        🔔
-        <span id="notif-count" style="display:none;position:absolute;top:-6px;right:-6px;background:#e24b4a;color:#fff;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:none;align-items:center;justify-content:center;padding:0 4px;line-height:1"></span>
-      </button>
-      <div id="notif-dropdown" style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:340px;background:var(--bg2);border:0.5px solid var(--border2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);overflow:hidden;z-index:201">
-        <div style="padding:10px 14px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:13px;font-weight:500">Recent alerts</span>
-          <button onclick="clearNotifs()" style="font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:0">Clear all</button>
-        </div>
-        <div id="notif-list" style="max-height:320px;overflow-y:auto"></div>
-        <div style="padding:10px 14px;border-top:0.5px solid var(--border);text-align:center">
-          <button onclick="nav('alerts');toggleNotifDropdown(false)" style="font-size:12px;color:var(--blue);background:none;border:none;cursor:pointer;padding:0">View all alerts →</button>
-        </div>
-      </div>
-    </div>
     <div class="page active" id="page-overview">
       <div class="page-header">
         <div>
@@ -302,7 +285,25 @@ tr.clickable:hover td{background:var(--bg3)}
           <div class="page-sub" id="overview-sub">Loading…</div>
           <div id="site-restriction-banner" style="display:none;margin-top:8px;font-size:12px;color:var(--yellow-text);background:var(--yellow-bg);border:0.5px solid var(--yellow-border);border-radius:var(--radius);padding:6px 10px"></div>
         </div>
-        <button onclick="refreshAll()">↻ Refresh</button>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button onclick="refreshAll()">↻ Refresh</button>
+          <div id="notif-bell-wrap" style="position:relative">
+            <button id="notif-bell-btn" onclick="toggleNotifDropdown()" style="position:relative;background:var(--bg2);border:0.5px solid var(--border2);border-radius:8px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:15px">
+              🔔
+              <span id="notif-count" style="display:none;position:absolute;top:-6px;right:-6px;background:#e24b4a;color:#fff;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 4px;line-height:1"></span>
+            </button>
+            <div id="notif-dropdown" style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:340px;background:var(--bg2);border:0.5px solid var(--border2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);overflow:hidden;z-index:201">
+              <div style="padding:10px 14px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:13px;font-weight:500">Recent alerts</span>
+                <button onclick="clearNotifs()" style="font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;padding:0">Clear all</button>
+              </div>
+              <div id="notif-list" style="max-height:320px;overflow-y:auto"></div>
+              <div style="padding:10px 14px;border-top:0.5px solid var(--border);text-align:center">
+                <button onclick="nav('alerts');toggleNotifDropdown(false)" style="font-size:12px;color:var(--blue);background:none;border:none;cursor:pointer;padding:0">View all alerts →</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="cards-row">
         <div class="stat-card green" onclick="nav('devices','green')">
