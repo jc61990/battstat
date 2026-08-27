@@ -335,7 +335,10 @@ tr.clickable:hover td{background:var(--bg3)}
           <div class="page-title">All Devices</div>
           <div class="page-sub" id="devices-sub"></div>
         </div>
-        <button class="primary" data-perm="can_edit_devices" onclick="openAddDevice()">+ Add Device</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button onclick="exportDevicesXlsx()" title="Export current view to Excel">⬇ Export</button>
+          <button class="primary" data-perm="can_edit_devices" onclick="openAddDevice()">+ Add Device</button>
+        </div>
       </div>
       <div class="filter-bar">
         <div class="filter-btn active" data-f="all" onclick="setFilter('all',this)">All</div>
@@ -796,6 +799,7 @@ tr.clickable:hover td{background:var(--bg3)}
 })();
 </script>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

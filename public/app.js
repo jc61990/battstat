@@ -504,6 +504,99 @@ function updateFilterButtons() {
   if (clearBtn) clearBtn.style.display = active.size > 1 ? '' : 'none';
 }
 
+function exportDevicesXlsx() {
+  if (typeof XLSX === 'undefined') {
+    toast('Export library not loaded yet, try again in a moment', 'error');
+    return;
+  }
+
+  const search = (document.getElementById('dev-search')?.value || '').toLowerCase();
+  const siteF  = document.getElementById('site-filter')?.value || '';
+
+  // Build same filtered/sorted list as the current view
+  let devs = state.devices.filter(d => {
+    const p = state.polls[d.id];
+    const s = battStatus(p, d);
+    if (state.deviceFilters.size > 0 && !state.deviceFilters.has(s)) return false;
+    if (siteF && String(d.site_id) !== String(siteF)) return false;
+    if (search) {
+      const hay = [d.name, d.ip, d.serial, d.model, d.floor,
+        p?.model_snmp, p?.serial_snmp, d.part_number].join(' ').toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  const statusOrder = { red: 0, unreachable: 1, yellow: 2, green: 3 };
+  devs.sort((a, b) => {
+    const pa = state.polls[a.id], pb = state.polls[b.id];
+    let av, bv;
+    switch (_sortCol) {
+      case 'status': av = statusOrder[battStatus(pa,a)]??9; bv = statusOrder[battStatus(pb,b)]??9; break;
+      case 'name':   av = a.name.toLowerCase(); bv = b.name.toLowerCase(); break;
+      case 'site':   av = (state.sites.find(s=>s.id===a.site_id)?.name||'').toLowerCase(); bv = (state.sites.find(s=>s.id===b.site_id)?.name||'').toLowerCase(); break;
+      case 'floor':  av = a.floor.toLowerCase(); bv = b.floor.toLowerCase(); break;
+      case 'batt':   av = pa?.batt_capacity??-1; bv = pb?.batt_capacity??-1; break;
+      case 'temp':   av = pa?.batt_temperature??-1; bv = pb?.batt_temperature??-1; break;
+      case 'runtime':av = pa?.batt_run_time??-1; bv = pb?.batt_run_time??-1; break;
+      case 'ip':     av = a.ip.split('.').map(n=>n.padStart(3,'0')).join('.'); bv = b.ip.split('.').map(n=>n.padStart(3,'0')).join('.'); break;
+      case 'replace':av = a.battery_installed||'z'; bv = b.battery_installed||'z'; break;
+      case 'model':  av = (pa?.model_snmp||a.model||'').toLowerCase(); bv = (pb?.model_snmp||b.model||'').toLowerCase(); break;
+      default: return 0;
+    }
+    if (av < bv) return -_sortDir;
+    if (av > bv) return _sortDir;
+    return 0;
+  });
+
+  const statusLabel = { red: 'Critical', yellow: 'Warning', green: 'Healthy', unreachable: 'Offline' };
+
+  const rows = devs.map(d => {
+    const p    = state.polls[d.id];
+    const site = state.sites.find(s => s.id === d.site_id);
+    const s    = battStatus(p, d);
+    return {
+      'Status':           statusLabel[s] || s,
+      'Device Name':      d.name,
+      'Site':             site?.name || '',
+      'Floor':            d.floor || '',
+      'IP Address':       d.ip,
+      'Charge (%)':       p?.batt_capacity ?? '',
+      'Runtime (min)':    p?.batt_run_time ?? '',
+      'Temperature (°C)': p?.batt_temperature ?? '',
+      'Input Voltage (V)':p?.input_voltage ?? '',
+      'Output Load (%)':  p?.output_load ?? '',
+      'Model':            p?.model_snmp || d.model || '',
+      'Part Number':      d.part_number || '',
+      'Serial':           p?.serial_snmp || d.serial || '',
+      'Battery Installed':d.battery_installed || '',
+      'Replace By':       p?.batt_replace_date || '',
+      'Last Self Test':   p?.self_test_result || '',
+      'Last Self Test Date': p?.self_test_date || '',
+      'Last Transfer':    p?.last_xfer_reason || '',
+      'Last Polled':      p?.polled_at ? new Date(p.polled_at * 1000).toLocaleString() : '',
+      'SNMP Version':     d.snmp_version || '',
+      'Firmware':         p?.firmware || '',
+      'Notes':            d.notes || '',
+    };
+  });
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+
+  // Auto-fit column widths
+  const cols = Object.keys(rows[0] || {});
+  ws['!cols'] = cols.map(c => ({
+    wch: Math.max(c.length, ...rows.map(r => String(r[c] ?? '').length)) + 2
+  }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Devices');
+
+  const filename = `battstat-${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, filename);
+  toast(`Exported ${devs.length} device${devs.length !== 1 ? 's' : ''} to ${filename}`, 'success');
+}
+
 function renderDeviceTable() {
   const search = (document.getElementById('dev-search')?.value || '').toLowerCase();
   const siteF = document.getElementById('site-filter')?.value || '';
