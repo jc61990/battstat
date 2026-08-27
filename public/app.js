@@ -301,7 +301,6 @@ function loadAlertsPage() {
     }
   }
 
-  // Sort: red first, then yellow, then offline
   const order = { red: 0, yellow: 1, unreachable: 2 };
   alerting.sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
 
@@ -317,49 +316,73 @@ function loadAlertsPage() {
     return;
   }
 
+  const statusDot = { red: '🔴', yellow: '🟡', unreachable: '⚫' };
+  const statusLabel = { red: 'Critical', yellow: 'Warning', unreachable: 'Offline' };
+  const statusColor = { red: 'var(--red-text)', yellow: 'var(--yellow-text)', unreachable: 'var(--text2)' };
+
   body.innerHTML = alerting.map(({ device: d, poll: p, status: s, site }) => {
     const reasons = getAlertReasons(p, d, s);
-    const label   = { red: 'Critical', yellow: 'Warning', unreachable: 'Offline' }[s] || s;
-    const color   = { red: 'var(--red-text)', yellow: 'var(--yellow-text)', unreachable: 'var(--text2)' }[s];
-    return `<div class="alert-item ${s}" onclick="openDrawer(${d.id})" style="cursor:pointer">
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
-          <span style="font-weight:500;font-size:13px">${esc(d.name)}</span>
-          <span style="font-size:11px;font-weight:500;color:${color}">${label}</span>
-          ${site ? `<span style="font-size:11px;color:var(--text3)">${esc(site.name)}</span>` : ''}
-        </div>
-        <div style="font-size:12px;color:var(--text2)">${esc(p?.model_snmp || d.model || '—')}</div>
-        ${reasons.length ? `<div style="font-size:12px;color:var(--text2);margin-top:4px">${reasons.join(' · ')}</div>` : ''}
+
+    // Metric pills: only show values that are relevant
+    const pills = [];
+    if (p?.batt_capacity   !== null && p?.batt_capacity   !== undefined) pills.push(`🔋 ${p.batt_capacity}%`);
+    if (p?.batt_run_time   !== null && p?.batt_run_time   !== undefined) pills.push(`⏱ ${p.batt_run_time}m`);
+    if (p?.batt_temperature!== null && p?.batt_temperature!== undefined) pills.push(`🌡 ${p.batt_temperature}°C`);
+    if (p?.output_load     !== null && p?.output_load     !== undefined) pills.push(`📊 ${p.output_load}%`);
+
+    const pillHtmlStr = pills.map(t =>
+      `<span style="font-size:11px;background:var(--bg);border:0.5px solid var(--border);border-radius:4px;padding:1px 5px;color:var(--text2)">${t}</span>`
+    ).join('');
+
+    const partBadge = d.part_number
+      ? `<span style="font-size:11px;font-family:monospace;color:var(--text3);background:var(--bg3);border-radius:3px;padding:1px 5px">${esc(d.part_number)}</span>`
+      : '';
+
+    return `<div class="alert-item ${s}" onclick="openDrawer(${d.id})" style="cursor:pointer;padding:8px 12px;gap:0;flex-direction:column">
+      <!-- Row 1: name + status + site + right meta -->
+      <div style="display:flex;align-items:center;gap:6px;width:100%">
+        <span style="font-size:12px;line-height:1">${statusDot[s]}</span>
+        <span style="font-weight:600;font-size:13px;flex-shrink:0">${esc(d.name)}</span>
+        <span style="font-size:10px;font-weight:600;color:${statusColor[s]};text-transform:uppercase;letter-spacing:.04em">${statusLabel[s]}</span>
+        ${site ? `<span style="font-size:11px;color:var(--text3);background:var(--bg3);border-radius:3px;padding:1px 5px">${esc(site.name)}</span>` : ''}
+        <span style="flex:1"></span>
+        ${d.floor ? `<span style="font-size:11px;color:var(--text3)">${esc(d.floor)}</span>` : ''}
+        <span style="font-size:11px;font-family:monospace;color:var(--text3)">${esc(d.ip)}</span>
+        <span style="font-size:10px;color:var(--text3)">${fmtTs(p?.polled_at)}</span>
       </div>
-      <div style="text-align:right;font-size:11px;color:var(--text3);flex-shrink:0">
-        ${d.floor ? `<div>${esc(d.floor)}</div>` : ''}
-        <div style="font-family:monospace">${esc(d.ip)}</div>
-        <div>${fmtTs(p?.polled_at)}</div>
+      <!-- Row 2: model + part + metrics -->
+      <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--text2)">${esc(p?.model_snmp || d.model || '—')}</span>
+        ${partBadge}
+        ${pillHtmlStr}
       </div>
+      <!-- Row 3: reasons -->
+      ${reasons.length ? `<div style="margin-top:3px;font-size:11px;color:var(--text2)">${reasons.join(' · ')}</div>` : ''}
     </div>`;
   }).join('');
 }
 
 function getAlertReasons(p, d, s) {
-  if (s === 'unreachable') return ['Not responding'];
+  if (s === 'unreachable') return ['Not responding to SNMP'];
   const reasons = [];
   if (!p) return reasons;
   if (p.batt_capacity !== null && p.batt_capacity < 40)
-    reasons.push(`${p.batt_capacity}% charge`);
+    reasons.push(`Battery ${p.batt_capacity}% charge`);
   if (p.batt_run_time !== null && p.batt_run_time < 20)
     reasons.push(`${p.batt_run_time} min runtime`);
   if (p.batt_temperature !== null && p.batt_temperature >= 40)
-    reasons.push(`${p.batt_temperature}°C`);
+    reasons.push(`${p.batt_temperature}°C temperature`);
   if (p.batt_replace_date) {
     const dd = new Date(p.batt_replace_date);
     if (!isNaN(dd)) {
       const days = Math.round((dd - new Date()) / 86400000);
-      if (days < 0) reasons.push('Replace date overdue');
+      if (days < 0) reasons.push(`Replace date overdue by ${Math.abs(days)}d`);
       else if (days < 90) reasons.push(`Replace in ${days}d`);
     }
   }
   if (['batteryLow','batteryInFaultCondition','batteryDepleted'].includes(p.batt_status))
     reasons.push(p.batt_status);
+  if (p.self_test_result === 'Fail') reasons.push('Self-test failed');
   return reasons;
 }
 
