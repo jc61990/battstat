@@ -276,6 +276,7 @@ sudo bash /opt/battstat/uninstall.sh --purge     # uninstall + delete DB
 ### 1.6.0
 - Excel export button on All Devices page — exports current filtered/sorted view to .xlsx including all poll data, auto-fitted column widths, named with today's date
 - Bell notification moved into Overview page header alongside Refresh button (no longer floating over content)
+- Site sub-nav badges — each site in the sidebar shows a live alert count (red for critical/offline, yellow for warnings)
 - Multi-select device status filters with clear button
 - Sort by Runtime and IP address
 - Device drawer: clickable IP link opens device web interface in new tab
