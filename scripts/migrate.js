@@ -198,6 +198,32 @@ apply(14, 'add_alert_state_columns', (db) => {
     db.exec("ALTER TABLE alert_state ADD COLUMN xfer_alerted_at INTEGER");
 });
 
+apply(15, 'add_extended_alert_config', (db) => {
+  const cfgCols = db.prepare('PRAGMA table_info(alert_config)').all().map(c => c.name);
+  const addCfg = (col, def) => { if (!cfgCols.includes(col)) db.exec(`ALTER TABLE alert_config ADD COLUMN ${col} ${def}`); };
+  addCfg('alert_self_test_fail', 'INTEGER NOT NULL DEFAULT 1');
+  addCfg('alert_not_charging',   'INTEGER NOT NULL DEFAULT 1');
+  addCfg('alert_battery_age',    'INTEGER NOT NULL DEFAULT 1');
+  addCfg('battery_age_years',    'REAL NOT NULL DEFAULT 4.0');
+  addCfg('alert_recovery',       'INTEGER NOT NULL DEFAULT 1');
+  addCfg('alert_high_load',      'INTEGER NOT NULL DEFAULT 1');
+  addCfg('high_load_threshold',  'INTEGER NOT NULL DEFAULT 80');
+  addCfg('alert_high_temp',      'INTEGER NOT NULL DEFAULT 1');
+  addCfg('high_temp_threshold',  'INTEGER NOT NULL DEFAULT 35');
+  addCfg('alert_stale',          'INTEGER NOT NULL DEFAULT 1');
+  addCfg('stale_hours',          'INTEGER NOT NULL DEFAULT 2');
+
+  const stateCols = db.prepare('PRAGMA table_info(alert_state)').all().map(c => c.name);
+  const addState = (col, def) => { if (!stateCols.includes(col)) db.exec(`ALTER TABLE alert_state ADD COLUMN ${col} ${def}`); };
+  addState('last_capacity',     'INTEGER');
+  addState('last_self_test',    'TEXT');
+  addState('recovery_alerted_at','INTEGER');
+  addState('load_alerted_at',   'INTEGER');
+  addState('temp_alerted_at',   'INTEGER');
+  addState('stale_alerted_at',  'INTEGER');
+  addState('not_charging_at',   'INTEGER');
+});
+
 // -- Summary -------------------------------------------------------------------
 const allMigrations = db.prepare('SELECT * FROM schema_migrations ORDER BY version').all();
 console.log(`\n[migrate] ${allMigrations.length} migration(s) recorded in schema_migrations.`);

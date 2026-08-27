@@ -2,7 +2,7 @@
 
 Self-hosted UPS battery health dashboard. Polls UPS devices via SNMP, displays live battery status, runtime, power readings, and diagnostic data. Supports multi-site management, role-based access control with per-role site restrictions, local users, LDAP / Active Directory authentication, and email alerting.
 
-**Current version: 1.6.0**
+**Current version: 1.7.0**
 
 ---
 
@@ -272,6 +272,17 @@ sudo bash /opt/battstat/uninstall.sh --purge     # uninstall + delete DB
 ---
 
 ## Changelog
+
+### 1.7.0
+- Extended email alerting with 7 new alert types:
+  - 🧪 Self-test failed — fires when UPS self-test returns a failure result
+  - 📉 Battery not charging — fires when capacity drops 5%+ between polls for over an hour
+  - 🗓️ Battery age exceeded — weekly reminder when battery age exceeds configurable threshold (default 4 years)
+  - ✅ Recovery — fires when UPS returns to line power after a power event
+  - 📊 High output load — fires when output load exceeds configurable threshold (default 80%)
+  - 🌡️ High temperature — fires when battery temperature exceeds configurable threshold (default 35°C)
+  - 🕐 Device not polling — fires when a device hasn't been polled in configurable hours (default 2h)
+- Alert Settings page redesigned with grouped conditions and inline thresholds
 
 ### 1.6.0
 - Excel export button on All Devices page — exports current filtered/sorted view to .xlsx including all poll data, auto-fitted column widths, named with today's date

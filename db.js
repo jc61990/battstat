@@ -165,19 +165,30 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_user_site_access_user ON user_site_access(user_id);
 
   CREATE TABLE IF NOT EXISTS alert_config (
-    id              INTEGER PRIMARY KEY,
-    enabled         INTEGER NOT NULL DEFAULT 0,
-    smtp_host       TEXT NOT NULL DEFAULT '',
-    smtp_port       INTEGER NOT NULL DEFAULT 587,
-    smtp_secure     INTEGER NOT NULL DEFAULT 0,
-    smtp_user       TEXT NOT NULL DEFAULT '',
-    smtp_pass       TEXT NOT NULL DEFAULT '',
-    smtp_from       TEXT NOT NULL DEFAULT '',
-    recipients      TEXT NOT NULL DEFAULT '',
-    alert_critical  INTEGER NOT NULL DEFAULT 1,
-    alert_warning   INTEGER NOT NULL DEFAULT 1,
-    alert_offline   INTEGER NOT NULL DEFAULT 1,
-    reminder_hours  INTEGER NOT NULL DEFAULT 24
+    id                      INTEGER PRIMARY KEY,
+    enabled                 INTEGER NOT NULL DEFAULT 0,
+    smtp_host               TEXT NOT NULL DEFAULT '',
+    smtp_port               INTEGER NOT NULL DEFAULT 587,
+    smtp_secure             INTEGER NOT NULL DEFAULT 0,
+    smtp_user               TEXT NOT NULL DEFAULT '',
+    smtp_pass               TEXT NOT NULL DEFAULT '',
+    smtp_from               TEXT NOT NULL DEFAULT '',
+    recipients              TEXT NOT NULL DEFAULT '',
+    alert_critical          INTEGER NOT NULL DEFAULT 1,
+    alert_warning           INTEGER NOT NULL DEFAULT 1,
+    alert_offline           INTEGER NOT NULL DEFAULT 1,
+    reminder_hours          INTEGER NOT NULL DEFAULT 24,
+    alert_self_test_fail    INTEGER NOT NULL DEFAULT 1,
+    alert_not_charging      INTEGER NOT NULL DEFAULT 1,
+    alert_battery_age       INTEGER NOT NULL DEFAULT 1,
+    battery_age_years       REAL    NOT NULL DEFAULT 4.0,
+    alert_recovery          INTEGER NOT NULL DEFAULT 1,
+    alert_high_load         INTEGER NOT NULL DEFAULT 1,
+    high_load_threshold     INTEGER NOT NULL DEFAULT 80,
+    alert_high_temp         INTEGER NOT NULL DEFAULT 1,
+    high_temp_threshold     INTEGER NOT NULL DEFAULT 35,
+    alert_stale             INTEGER NOT NULL DEFAULT 1,
+    stale_hours             INTEGER NOT NULL DEFAULT 2
   );
 
   INSERT OR IGNORE INTO alert_config (id) VALUES (1);
@@ -189,7 +200,14 @@ db.exec(`
     last_alerted_at      INTEGER,
     consecutive_failures INTEGER NOT NULL DEFAULT 0,
     last_xfer_reason     TEXT,
-    xfer_alerted_at      INTEGER
+    xfer_alerted_at      INTEGER,
+    last_capacity        INTEGER,
+    last_self_test       TEXT,
+    recovery_alerted_at  INTEGER,
+    load_alerted_at      INTEGER,
+    temp_alerted_at      INTEGER,
+    stale_alerted_at     INTEGER,
+    not_charging_at      INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS audit_log (
@@ -480,15 +498,22 @@ module.exports = {
   saveAlertConfig(cfg) {
     db.prepare(`UPDATE alert_config SET
       enabled=?,smtp_host=?,smtp_port=?,smtp_secure=?,smtp_user=?,smtp_pass=?,
-      smtp_from=?,recipients=?,alert_critical=?,alert_warning=?,alert_offline=?,reminder_hours=?
+      smtp_from=?,recipients=?,alert_critical=?,alert_warning=?,alert_offline=?,reminder_hours=?,
+      alert_self_test_fail=?,alert_not_charging=?,alert_battery_age=?,battery_age_years=?,
+      alert_recovery=?,alert_high_load=?,high_load_threshold=?,
+      alert_high_temp=?,high_temp_threshold=?,alert_stale=?,stale_hours=?
       WHERE id=1`).run(
       cfg.enabled?1:0, cfg.smtp_host||'', cfg.smtp_port||587, cfg.smtp_secure?1:0,
       cfg.smtp_user||'',
-      // preserve existing password if placeholder sent
       (cfg.smtp_pass && cfg.smtp_pass !== '********') ? cfg.smtp_pass : db.prepare('SELECT smtp_pass FROM alert_config WHERE id=1').get()?.smtp_pass || '',
       cfg.smtp_from||'', cfg.recipients||'',
       cfg.alert_critical?1:0, cfg.alert_warning?1:0, cfg.alert_offline?1:0,
-      cfg.reminder_hours||24
+      cfg.reminder_hours||24,
+      cfg.alert_self_test_fail?1:0, cfg.alert_not_charging?1:0,
+      cfg.alert_battery_age?1:0, parseFloat(cfg.battery_age_years)||4.0,
+      cfg.alert_recovery?1:0, cfg.alert_high_load?1:0, parseInt(cfg.high_load_threshold)||80,
+      cfg.alert_high_temp?1:0, parseInt(cfg.high_temp_threshold)||35,
+      cfg.alert_stale?1:0, parseInt(cfg.stale_hours)||2
     );
     return this.getAlertConfig();
   },

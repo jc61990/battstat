@@ -485,19 +485,59 @@ tr.clickable:hover td{background:var(--bg3)}
             <div style="font-size:11px;color:var(--text3);margin-top:3px">Comma-separated list of email addresses</div>
           </div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-            <div>
-              <label style="display:block;margin-bottom:6px">Alert on</label>
-              <div style="display:flex;flex-direction:column;gap:5px">
-                <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-critical"> Critical status</label>
-                <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-warning"> Warning status</label>
-                <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-offline"> Device offline</label>
+          <div style="border-top:0.5px solid var(--border);padding-top:14px;margin-bottom:10px">
+            <label style="display:block;margin-bottom:10px;font-weight:500">Alert conditions</label>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <!-- Left column -->
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Status alerts</div>
+                <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-critical"> 🔴 Critical status</label>
+                <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-warning"> 🟡 Warning status</label>
+                <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-offline"> ⚫ Device offline</label>
+                <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-recovery"> ✅ Recovery (back on line power)</label>
+
+                <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">Battery health</div>
+                <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-self-test-fail"> 🧪 Self-test failed</label>
+                <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-not-charging"> 📉 Battery not charging</label>
+                <div class="form-row" style="margin:0">
+                  <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-battery-age"> 🗓️ Battery age exceeded</label>
+                  <div style="display:flex;align-items:center;gap:6px;margin-top:4px;padding-left:22px">
+                    <input type="number" id="alert-battery-age-years" value="4" min="1" max="10" step="0.5" style="width:60px">
+                    <span style="font-size:12px;color:var(--text2)">years threshold</span>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div class="form-row">
-              <label>Reminder interval (hours)</label>
-              <input type="number" id="alert-reminder-hours" value="24" min="1" max="168">
-              <div style="font-size:11px;color:var(--text3);margin-top:3px">Resend alert if condition persists</div>
+
+              <!-- Right column -->
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Power &amp; load</div>
+                <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-high-load"> 📊 High output load</label>
+                <div style="display:flex;align-items:center;gap:6px;padding-left:22px">
+                  <input type="number" id="alert-high-load-threshold" value="80" min="50" max="99" style="width:60px">
+                  <span style="font-size:12px;color:var(--text2)">% threshold</span>
+                </div>
+
+                <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">Environment</div>
+                <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-high-temp"> 🌡️ High temperature</label>
+                <div style="display:flex;align-items:center;gap:6px;padding-left:22px">
+                  <input type="number" id="alert-high-temp-threshold" value="35" min="20" max="60" style="width:60px">
+                  <span style="font-size:12px;color:var(--text2)">°C threshold</span>
+                </div>
+
+                <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">Operational</div>
+                <label style="display:flex;align-items:center;gap:7px;font-weight:400;cursor:pointer"><input type="checkbox" id="alert-stale"> 🕐 Device not polling</label>
+                <div style="display:flex;align-items:center;gap:6px;padding-left:22px">
+                  <input type="number" id="alert-stale-hours" value="2" min="1" max="48" style="width:60px">
+                  <span style="font-size:12px;color:var(--text2)">hours without poll</span>
+                </div>
+
+                <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">Reminders</div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <input type="number" id="alert-reminder-hours" value="24" min="1" max="168" style="width:60px">
+                  <span style="font-size:12px;color:var(--text2)">hours between reminders</span>
+                </div>
+              </div>
             </div>
           </div>
 

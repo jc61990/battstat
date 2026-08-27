@@ -1011,35 +1011,57 @@ async function bulkSetSnmpVersion() {
 async function loadAlertConfig() {
   try {
     const cfg = await apiFetch('/alert/config');
-    document.getElementById('alert-enabled').checked       = !!cfg.enabled;
-    document.getElementById('alert-smtp-host').value       = cfg.smtp_host || '';
-    document.getElementById('alert-smtp-port').value       = cfg.smtp_port || 587;
-    document.getElementById('alert-smtp-secure').checked   = !!cfg.smtp_secure;
-    document.getElementById('alert-smtp-user').value       = cfg.smtp_user || '';
-    document.getElementById('alert-smtp-pass').value       = '';
-    document.getElementById('alert-smtp-from').value       = cfg.smtp_from || '';
-    document.getElementById('alert-recipients').value      = cfg.recipients || '';
-    document.getElementById('alert-critical').checked      = !!cfg.alert_critical;
-    document.getElementById('alert-warning').checked       = !!cfg.alert_warning;
-    document.getElementById('alert-offline').checked       = !!cfg.alert_offline;
-    document.getElementById('alert-reminder-hours').value  = cfg.reminder_hours || 24;
+    document.getElementById('alert-enabled').checked          = !!cfg.enabled;
+    document.getElementById('alert-smtp-host').value          = cfg.smtp_host || '';
+    document.getElementById('alert-smtp-port').value          = cfg.smtp_port || 587;
+    document.getElementById('alert-smtp-secure').checked      = !!cfg.smtp_secure;
+    document.getElementById('alert-smtp-user').value          = cfg.smtp_user || '';
+    document.getElementById('alert-smtp-pass').value          = '';
+    document.getElementById('alert-smtp-from').value          = cfg.smtp_from || '';
+    document.getElementById('alert-recipients').value         = cfg.recipients || '';
+    document.getElementById('alert-critical').checked         = !!cfg.alert_critical;
+    document.getElementById('alert-warning').checked          = !!cfg.alert_warning;
+    document.getElementById('alert-offline').checked          = !!cfg.alert_offline;
+    document.getElementById('alert-recovery').checked         = cfg.alert_recovery !== 0;
+    document.getElementById('alert-self-test-fail').checked   = cfg.alert_self_test_fail !== 0;
+    document.getElementById('alert-not-charging').checked     = cfg.alert_not_charging !== 0;
+    document.getElementById('alert-battery-age').checked      = cfg.alert_battery_age !== 0;
+    document.getElementById('alert-battery-age-years').value  = cfg.battery_age_years || 4;
+    document.getElementById('alert-high-load').checked        = cfg.alert_high_load !== 0;
+    document.getElementById('alert-high-load-threshold').value= cfg.high_load_threshold || 80;
+    document.getElementById('alert-high-temp').checked        = cfg.alert_high_temp !== 0;
+    document.getElementById('alert-high-temp-threshold').value= cfg.high_temp_threshold || 35;
+    document.getElementById('alert-stale').checked            = cfg.alert_stale !== 0;
+    document.getElementById('alert-stale-hours').value        = cfg.stale_hours || 2;
+    document.getElementById('alert-reminder-hours').value     = cfg.reminder_hours || 24;
   } catch (e) { toast('Failed to load alert config', 'error'); }
 }
 
 async function saveAlertConfig() {
   const body = {
-    enabled:        document.getElementById('alert-enabled').checked,
-    smtp_host:      document.getElementById('alert-smtp-host').value.trim(),
-    smtp_port:      parseInt(document.getElementById('alert-smtp-port').value) || 587,
-    smtp_secure:    document.getElementById('alert-smtp-secure').checked,
-    smtp_user:      document.getElementById('alert-smtp-user').value.trim(),
-    smtp_pass:      document.getElementById('alert-smtp-pass').value,
-    smtp_from:      document.getElementById('alert-smtp-from').value.trim(),
-    recipients:     document.getElementById('alert-recipients').value.trim(),
-    alert_critical: document.getElementById('alert-critical').checked,
-    alert_warning:  document.getElementById('alert-warning').checked,
-    alert_offline:  document.getElementById('alert-offline').checked,
-    reminder_hours: parseInt(document.getElementById('alert-reminder-hours').value) || 24,
+    enabled:              document.getElementById('alert-enabled').checked,
+    smtp_host:            document.getElementById('alert-smtp-host').value.trim(),
+    smtp_port:            parseInt(document.getElementById('alert-smtp-port').value) || 587,
+    smtp_secure:          document.getElementById('alert-smtp-secure').checked,
+    smtp_user:            document.getElementById('alert-smtp-user').value.trim(),
+    smtp_pass:            document.getElementById('alert-smtp-pass').value,
+    smtp_from:            document.getElementById('alert-smtp-from').value.trim(),
+    recipients:           document.getElementById('alert-recipients').value.trim(),
+    alert_critical:       document.getElementById('alert-critical').checked,
+    alert_warning:        document.getElementById('alert-warning').checked,
+    alert_offline:        document.getElementById('alert-offline').checked,
+    alert_recovery:       document.getElementById('alert-recovery').checked,
+    alert_self_test_fail: document.getElementById('alert-self-test-fail').checked,
+    alert_not_charging:   document.getElementById('alert-not-charging').checked,
+    alert_battery_age:    document.getElementById('alert-battery-age').checked,
+    battery_age_years:    parseFloat(document.getElementById('alert-battery-age-years').value) || 4,
+    alert_high_load:      document.getElementById('alert-high-load').checked,
+    high_load_threshold:  parseInt(document.getElementById('alert-high-load-threshold').value) || 80,
+    alert_high_temp:      document.getElementById('alert-high-temp').checked,
+    high_temp_threshold:  parseInt(document.getElementById('alert-high-temp-threshold').value) || 35,
+    alert_stale:          document.getElementById('alert-stale').checked,
+    stale_hours:          parseInt(document.getElementById('alert-stale-hours').value) || 2,
+    reminder_hours:       parseInt(document.getElementById('alert-reminder-hours').value) || 24,
   };
   try {
     await apiFetch('/alert/config', { method: 'POST', body });
