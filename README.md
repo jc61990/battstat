@@ -2,7 +2,7 @@
 
 Self-hosted UPS battery health dashboard. Polls UPS devices via SNMP, displays live battery status, runtime, power readings, and diagnostic data. Supports multi-site management, role-based access control with per-role site restrictions, local users, LDAP / Active Directory authentication, and email alerting.
 
-**Current version: 1.5.0**
+**Current version: 1.6.0**
 
 ---
 
@@ -15,6 +15,7 @@ Self-hosted UPS battery health dashboard. Polls UPS devices via SNMP, displays l
 - **Multi-site** — group devices by physical location, filter dashboard by site
 - **Role-based access** — custom roles with per-permission and per-site restrictions (works for LDAP users)
 - **LDAP/AD auth** — no domain join required; maps AD groups to roles
+- **Excel export** — export current filtered/sorted device view to .xlsx with all poll data
 - **In-browser notifications** — real-time toast alerts and bell icon with dropdown on status changes via WebSocket, no OS permissions required
 - **Email alerting** — SMTP alerts on critical/warning/offline/power-event status changes, with configurable reminder interval
 - **Battery part number auto-fill** — looks up replacement part from SNMP model string
@@ -271,6 +272,14 @@ sudo bash /opt/battstat/uninstall.sh --purge     # uninstall + delete DB
 ---
 
 ## Changelog
+
+### 1.6.0
+- Excel export button on All Devices page — exports current filtered/sorted view to .xlsx including all poll data, auto-fitted column widths, named with today's date
+- Bell notification moved into Overview page header alongside Refresh button (no longer floating over content)
+- Multi-select device status filters with clear button
+- Sort by Runtime and IP address
+- Device drawer: clickable IP link opens device web interface in new tab
+- Default dark mode
 
 ### 1.5.0
 - Bell notification icon (top right) with unread badge and dropdown showing last 10 alerts — all in-browser, no OS permissions
