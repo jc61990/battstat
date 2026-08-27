@@ -2,7 +2,7 @@
 
 Self-hosted UPS battery health dashboard. Polls UPS devices via SNMP, displays live battery status, runtime, power readings, and diagnostic data. Supports multi-site management, role-based access control with per-role site restrictions, local users, LDAP / Active Directory authentication, and email alerting.
 
-**Current version: 1.7.1**
+**Current version: 1.7.2**
 
 ---
 
@@ -272,6 +272,19 @@ sudo bash /opt/battstat/uninstall.sh --purge     # uninstall + delete DB
 ---
 
 ## Changelog
+
+### 1.7.2
+- Alerts page redesigned — compact 3-row cards showing device name, status, site, floor, IP, and timestamp on row 1; model, part number badge, and live metric pills (charge, runtime, temp, load) on row 2; specific alert reasons on row 3
+- Alert reasons now include self-test failure and more specific wording
+- Click any alert card to open the device detail drawer
+
+### 1.7.1
+- Email layout tightened — less padding, compact device table with uppercase labels, live metrics shown as pill cards
+- Alert Detail section now has colored left-border accent and bold 14px text
+- Richer email subjects — format: `BattStat Critical: device-name [Site] Floor N — specific reason` for easy ticket board routing
+- Resolved emails — fires ✅ green email when a device returns to healthy status after being in alert
+- Recovery email when UPS returns to line power after a power event
+- `buildResolvedEmail` function for consistent resolved formatting
 
 ### 1.7.0
 - Extended email alerting with 7 new alert types:
