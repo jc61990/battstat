@@ -2,7 +2,7 @@
 
 Self-hosted UPS battery health dashboard. Polls UPS devices via SNMP, displays live battery status, runtime, power readings, and diagnostic data. Supports multi-site management, role-based access control with per-role site restrictions, local users, LDAP / Active Directory authentication, and email alerting.
 
-**Current version: 1.7.2**
+**Current version: 1.7.3**
 
 ---
 
@@ -272,6 +272,9 @@ sudo bash /opt/battstat/uninstall.sh --purge     # uninstall + delete DB
 ---
 
 ## Changelog
+
+### 1.7.3
+- Bell notification button moved to sidebar footer — visible on all pages, dropdown opens upward
 
 ### 1.7.2
 - Alerts page redesigned — compact 3-row cards showing device name, status, site, floor, IP, and timestamp on row 1; model, part number badge, and live metric pills (charge, runtime, temp, load) on row 2; specific alert reasons on row 3
