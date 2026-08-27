@@ -251,16 +251,22 @@ function renderNavSiteList() {
   container.innerHTML = state.sites.map(site => {
     const devs = state.devices.filter(d => d.site_id === site.id);
     let dotColor = '#639922';
+    let redCount = 0, yellowCount = 0;
     for (const d of devs) {
       const s = battStatus(state.polls[d.id], d);
-      if (s === 'red')    { dotColor = '#e24b4a'; break; }
-      if (s === 'yellow') { dotColor = '#ef9f27'; }
+      if (s === 'red')    { dotColor = '#e24b4a'; redCount++; }
+      else if (s === 'yellow') { if (dotColor !== '#e24b4a') dotColor = '#ef9f27'; yellowCount++; }
+      else if (s === 'unreachable') { if (dotColor !== '#e24b4a') dotColor = '#ef9f27'; yellowCount++; }
     }
+    const badgeCount = redCount + yellowCount;
+    const badgeBg = redCount > 0 ? 'var(--red-bg)' : 'var(--yellow-bg)';
+    const badgeColor = redCount > 0 ? 'var(--red-text)' : 'var(--yellow-text)';
     const isActive = state.currentPage === 'devices' &&
       document.getElementById('site-filter')?.value === String(site.id);
     return `<div class="nav-site-item${isActive ? ' active' : ''}" onclick="navToSite(${site.id})">
       <span class="nav-site-dot" style="background:${dotColor}"></span>
-      ${esc(site.name)}
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis">${esc(site.name)}</span>
+      ${badgeCount > 0 ? `<span style="font-size:10px;font-weight:600;padding:1px 5px;border-radius:8px;background:${badgeBg};color:${badgeColor};flex-shrink:0">${badgeCount}</span>` : ''}
     </div>`;
   }).join('');
 }
