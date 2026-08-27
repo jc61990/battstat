@@ -27,12 +27,14 @@ async function apiFetch(path, opts = {}) {
   return json.data;
 }
 
-function toast(msg, type = 'info') {
+function toast(msg, type = 'info', duration = 3500) {
   const el = document.createElement('div');
   el.className = `toast ${type}`;
   el.textContent = msg;
+  el.style.cursor = 'pointer';
+  el.onclick = () => el.remove();
   document.getElementById('toasts').appendChild(el);
-  setTimeout(() => el.remove(), 3500);
+  setTimeout(() => el.remove(), duration);
 }
 
 function nav(page, filter) {
@@ -50,6 +52,7 @@ function nav(page, filter) {
   if (page === 'sites') renderSitesTable();
   if (page === 'settings') loadSnmpConfig();
   if (page === 'alerting') loadAlertConfig();
+  if (page === 'alerts')   loadAlertsPage();
   if (page === 'users') { if(typeof loadAdminData==='function'){loadAdminData();loadLdapConfig();} }
   if (page === 'audit') { if(typeof loadAuditLog==='function') loadAuditLog(); }
 }
@@ -234,25 +237,145 @@ async function loadAll() {
 
 function renderAll() {
   renderOverview();
+  renderNavSiteList();
   if (state.currentPage === 'devices') renderDeviceTable();
-  if (state.currentPage === 'sites') renderSitesTable();
+  if (state.currentPage === 'sites')   renderSitesTable();
+  if (state.currentPage === 'alerts')  loadAlertsPage();
   updateNavBadges();
 }
 
-function updateNavBadges() {
-  let red = 0, yellow = 0;
+function renderNavSiteList() {
+  const container = document.getElementById('nav-site-list');
+  if (!container) return;
+  if (!state.sites.length) { container.innerHTML = ''; return; }
+  container.innerHTML = state.sites.map(site => {
+    const devs = state.devices.filter(d => d.site_id === site.id);
+    let dotColor = '#639922';
+    for (const d of devs) {
+      const s = battStatus(state.polls[d.id], d);
+      if (s === 'red')    { dotColor = '#e24b4a'; break; }
+      if (s === 'yellow') { dotColor = '#ef9f27'; }
+    }
+    const isActive = state.currentPage === 'devices' &&
+      document.getElementById('site-filter')?.value === String(site.id);
+    return `<div class="nav-site-item${isActive ? ' active' : ''}" onclick="navToSite(${site.id})">
+      <span class="nav-site-dot" style="background:${dotColor}"></span>
+      ${esc(site.name)}
+    </div>`;
+  }).join('');
+}
+
+function navToSite(siteId) {
+  nav('devices');
+  const siteFilter = document.getElementById('site-filter');
+  if (siteFilter) {
+    siteFilter.value = siteId;
+    state.deviceFilters = new Set();
+    updateFilterButtons();
+    renderDeviceTable();
+  }
+  // Update site sub-nav active state
+  document.querySelectorAll('.nav-site-item').forEach(el => {
+    el.classList.toggle('active', el.onclick?.toString().includes(siteId));
+  });
+}
+
+function loadAlertsPage() {
+  const body = document.getElementById('alerts-body');
+  const sub  = document.getElementById('alerts-sub');
+  if (!body) return;
+
+  const alerting = [];
   for (const d of state.devices) {
     const p = state.polls[d.id];
     const s = battStatus(p, d);
-    if (s === 'red') red++;
+    if (s === 'red' || s === 'yellow' || s === 'unreachable') {
+      const site = state.sites.find(x => x.id === d.site_id);
+      alerting.push({ device: d, poll: p, status: s, site });
+    }
+  }
+
+  // Sort: red first, then yellow, then offline
+  const order = { red: 0, yellow: 1, unreachable: 2 };
+  alerting.sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
+
+  if (sub) sub.textContent = alerting.length
+    ? `${alerting.length} device${alerting.length !== 1 ? 's' : ''} need attention`
+    : 'No active alerts';
+
+  if (!alerting.length) {
+    body.innerHTML = `<div style="padding:40px 0;text-align:center;color:var(--text3)">
+      <div style="font-size:32px;margin-bottom:8px">✓</div>
+      <div style="font-size:14px">All devices healthy</div>
+    </div>`;
+    return;
+  }
+
+  body.innerHTML = alerting.map(({ device: d, poll: p, status: s, site }) => {
+    const reasons = getAlertReasons(p, d, s);
+    const label   = { red: 'Critical', yellow: 'Warning', unreachable: 'Offline' }[s] || s;
+    const color   = { red: 'var(--red-text)', yellow: 'var(--yellow-text)', unreachable: 'var(--text2)' }[s];
+    return `<div class="alert-item ${s}" onclick="openDrawer(${d.id})" style="cursor:pointer">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-weight:500;font-size:13px">${esc(d.name)}</span>
+          <span style="font-size:11px;font-weight:500;color:${color}">${label}</span>
+          ${site ? `<span style="font-size:11px;color:var(--text3)">${esc(site.name)}</span>` : ''}
+        </div>
+        <div style="font-size:12px;color:var(--text2)">${esc(p?.model_snmp || d.model || '—')}</div>
+        ${reasons.length ? `<div style="font-size:12px;color:var(--text2);margin-top:4px">${reasons.join(' · ')}</div>` : ''}
+      </div>
+      <div style="text-align:right;font-size:11px;color:var(--text3);flex-shrink:0">
+        ${d.floor ? `<div>${esc(d.floor)}</div>` : ''}
+        <div style="font-family:monospace">${esc(d.ip)}</div>
+        <div>${fmtTs(p?.polled_at)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function getAlertReasons(p, d, s) {
+  if (s === 'unreachable') return ['Not responding'];
+  const reasons = [];
+  if (!p) return reasons;
+  if (p.batt_capacity !== null && p.batt_capacity < 40)
+    reasons.push(`${p.batt_capacity}% charge`);
+  if (p.batt_run_time !== null && p.batt_run_time < 20)
+    reasons.push(`${p.batt_run_time} min runtime`);
+  if (p.batt_temperature !== null && p.batt_temperature >= 40)
+    reasons.push(`${p.batt_temperature}°C`);
+  if (p.batt_replace_date) {
+    const dd = new Date(p.batt_replace_date);
+    if (!isNaN(dd)) {
+      const days = Math.round((dd - new Date()) / 86400000);
+      if (days < 0) reasons.push('Replace date overdue');
+      else if (days < 90) reasons.push(`Replace in ${days}d`);
+    }
+  }
+  if (['batteryLow','batteryInFaultCondition','batteryDepleted'].includes(p.batt_status))
+    reasons.push(p.batt_status);
+  return reasons;
+}
+
+function updateNavBadges() {
+  let red = 0, yellow = 0, offline = 0;
+  for (const d of state.devices) {
+    const p = state.polls[d.id];
+    const s = battStatus(p, d);
+    if (s === 'red')         red++;
     else if (s === 'yellow') yellow++;
+    else if (s === 'unreachable') offline++;
   }
   const rb = document.getElementById('nav-red');
   const yb = document.getElementById('nav-yellow');
-  rb.style.display = red ? '' : 'none';
-  rb.textContent = red;
-  yb.style.display = yellow ? '' : 'none';
-  yb.textContent = yellow;
+  const ab = document.getElementById('nav-alerts');
+  if (rb) { rb.style.display = red ? '' : 'none'; rb.textContent = red; }
+  if (yb) { yb.style.display = yellow ? '' : 'none'; yb.textContent = yellow; }
+  if (ab) {
+    const total = red + yellow + offline;
+    ab.style.display = total ? '' : 'none';
+    ab.textContent = total;
+  }
 }
 
 function renderOverview() {
@@ -881,15 +1004,136 @@ function connectWs() {
       const { event, data } = JSON.parse(e.data);
       if (event === 'poll_complete') {
         for (const item of data) {
-          state.polls[item.device_id] = {
-            ...item,
-            polled_at: Math.floor(Date.now() / 1000),
-          };
+          const prevPoll = state.polls[item.device_id];
+          const prevStatus = prevPoll ? battStatus(prevPoll, state.devices.find(d => d.id === item.device_id)) : null;
+          state.polls[item.device_id] = { ...item, polled_at: Math.floor(Date.now() / 1000) };
+          const newStatus = battStatus(state.polls[item.device_id], state.devices.find(d => d.id === item.device_id));
+          // Fire notification if status changed to something worse
+          if (prevStatus !== null && prevStatus !== newStatus) {
+            checkStatusChangeNotif(item.device_id, prevStatus, newStatus);
+          }
         }
         renderAll();
       }
     } catch (_) {}
   };
+}
+
+// ─── NOTIFICATION SYSTEM ─────────────────────────────────────────────────────
+
+const notifStore = []; // { id, deviceId, deviceName, site, prevStatus, newStatus, ts, reason }
+let notifUnread = 0;
+let notifDropdownOpen = false;
+
+const STATUS_WORSE = { green: 0, yellow: 1, unreachable: 2, red: 3 };
+
+function checkStatusChangeNotif(deviceId, prevStatus, newStatus) {
+  const device = state.devices.find(d => d.id === deviceId);
+  if (!device) return;
+  const site = state.sites.find(s => s.id === device.site_id);
+  const poll = state.polls[deviceId];
+
+  const prevLevel = STATUS_WORSE[prevStatus] ?? 0;
+  const newLevel  = STATUS_WORSE[newStatus]  ?? 0;
+
+  const label = { red: 'Critical', yellow: 'Warning', unreachable: 'Offline', green: 'Recovered' };
+  const icon  = { red: '🔴', yellow: '🟡', unreachable: '⚫', green: '🟢' };
+
+  // Notify on any status change (worse or recovery)
+  if (prevStatus === newStatus) return;
+
+  const reasons = getAlertReasons(poll, device, newStatus);
+  const notif = {
+    id: Date.now(),
+    deviceId,
+    deviceName: device.name,
+    site: site?.name || '',
+    prevStatus,
+    newStatus,
+    ts: Date.now(),
+    label: label[newStatus] || newStatus,
+    icon: icon[newStatus] || '●',
+    reason: reasons.join(' · ') || '',
+  };
+
+  notifStore.unshift(notif);
+  if (notifStore.length > 50) notifStore.pop(); // cap at 50
+
+  if (!notifDropdownOpen) {
+    notifUnread++;
+    updateNotifBadge();
+  }
+
+  renderNotifDropdown();
+
+  // Toast notification
+  const toastColor = { red: 'error', yellow: 'warning', unreachable: 'error', green: 'success' }[newStatus] || 'info';
+  const toastMsg = `${notif.icon} ${device.name} — ${notif.label}${notif.reason ? ': ' + notif.reason : ''}`;
+  toast(toastMsg, toastColor, 6000);
+}
+
+function updateNotifBadge() {
+  const count = document.getElementById('notif-count');
+  if (!count) return;
+  if (notifUnread > 0) {
+    count.style.display = 'flex';
+    count.textContent = notifUnread > 99 ? '99+' : notifUnread;
+  } else {
+    count.style.display = 'none';
+  }
+}
+
+function toggleNotifDropdown(force) {
+  notifDropdownOpen = force !== undefined ? force : !notifDropdownOpen;
+  const dropdown = document.getElementById('notif-dropdown');
+  if (!dropdown) return;
+  dropdown.style.display = notifDropdownOpen ? '' : 'none';
+  if (notifDropdownOpen) {
+    notifUnread = 0;
+    updateNotifBadge();
+    renderNotifDropdown();
+    // Close on outside click
+    setTimeout(() => document.addEventListener('click', closeNotifOnOutside), 0);
+  } else {
+    document.removeEventListener('click', closeNotifOnOutside);
+  }
+}
+
+function closeNotifOnOutside(e) {
+  const wrap = document.getElementById('notif-bell-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    toggleNotifDropdown(false);
+    document.removeEventListener('click', closeNotifOnOutside);
+  }
+}
+
+function clearNotifs() {
+  notifStore.length = 0;
+  notifUnread = 0;
+  updateNotifBadge();
+  renderNotifDropdown();
+}
+
+function renderNotifDropdown() {
+  const list = document.getElementById('notif-list');
+  if (!list) return;
+  if (!notifStore.length) {
+    list.innerHTML = `<div style="padding:20px 14px;text-align:center;color:var(--text3);font-size:13px">No recent alerts</div>`;
+    return;
+  }
+  const recent = notifStore.slice(0, 10);
+  list.innerHTML = recent.map(n => {
+    const age = fmtTs(Math.floor(n.ts / 1000));
+    const bg = { red: 'var(--red-bg)', yellow: 'var(--yellow-bg)', unreachable: 'var(--bg3)', green: 'var(--bg3)' }[n.newStatus] || 'var(--bg3)';
+    return `<div onclick="nav('alerts');toggleNotifDropdown(false)" style="padding:10px 14px;border-bottom:0.5px solid var(--border);cursor:pointer;background:${bg};transition:opacity .15s" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+        <span style="font-size:13px">${n.icon}</span>
+        <span style="font-size:12px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.deviceName)}</span>
+        <span style="font-size:10px;color:var(--text3);flex-shrink:0">${age}</span>
+      </div>
+      <div style="font-size:11px;color:var(--text2);padding-left:19px">${esc(n.site)}${n.reason ? ' · ' + esc(n.reason) : ''}</div>
+    </div>`;
+  }).join('');
 }
 
 function esc(str) {

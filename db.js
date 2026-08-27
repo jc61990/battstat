@@ -183,10 +183,13 @@ db.exec(`
   INSERT OR IGNORE INTO alert_config (id) VALUES (1);
 
   CREATE TABLE IF NOT EXISTS alert_state (
-    device_id       INTEGER PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
-    last_status     TEXT NOT NULL DEFAULT 'green',
-    alerted_status  TEXT,
-    last_alerted_at INTEGER
+    device_id            INTEGER PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
+    last_status          TEXT NOT NULL DEFAULT 'green',
+    alerted_status       TEXT,
+    last_alerted_at      INTEGER,
+    consecutive_failures INTEGER NOT NULL DEFAULT 0,
+    last_xfer_reason     TEXT,
+    xfer_alerted_at      INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS audit_log (
@@ -492,18 +495,36 @@ module.exports = {
   getAlertState(deviceId) {
     return db.prepare('SELECT * FROM alert_state WHERE device_id=?').get(deviceId);
   },
-  upsertAlertState(deviceId, status) {
-    db.prepare(`INSERT INTO alert_state (device_id, last_status) VALUES (?,?)
-      ON CONFLICT(device_id) DO UPDATE SET last_status=excluded.last_status`)
-      .run(deviceId, status);
+  upsertAlertState(deviceId, status, reachable) {
+    const failures = reachable ? 0 : null; // null = increment
+    db.prepare(`INSERT INTO alert_state (device_id, last_status, consecutive_failures)
+      VALUES (?, ?, ?)
+      ON CONFLICT(device_id) DO UPDATE SET
+        last_status = excluded.last_status,
+        consecutive_failures = CASE WHEN ? THEN 0 ELSE consecutive_failures + 1 END`)
+      .run(deviceId, status, reachable ? 0 : 1, reachable ? 1 : 0);
   },
   markAlerted(deviceId, status) {
-    db.prepare(`INSERT INTO alert_state (device_id, last_status, alerted_status, last_alerted_at) VALUES (?,?,?,unixepoch())
-      ON CONFLICT(device_id) DO UPDATE SET alerted_status=excluded.alerted_status, last_alerted_at=unixepoch()`)
+    db.prepare(`INSERT INTO alert_state (device_id, last_status, alerted_status, last_alerted_at)
+      VALUES (?,?,?,unixepoch())
+      ON CONFLICT(device_id) DO UPDATE SET
+        alerted_status=excluded.alerted_status,
+        last_alerted_at=unixepoch()`)
       .run(deviceId, status, status);
+  },
+  markXferAlerted(deviceId, xferReason) {
+    db.prepare(`INSERT INTO alert_state (device_id, last_status, last_xfer_reason, xfer_alerted_at)
+      VALUES (?,?,?,unixepoch())
+      ON CONFLICT(device_id) DO UPDATE SET
+        last_xfer_reason=excluded.last_xfer_reason,
+        xfer_alerted_at=unixepoch()`)
+      .run(deviceId, 'green', xferReason);
   },
   clearAlertState(deviceId) {
     db.prepare('UPDATE alert_state SET alerted_status=NULL, last_alerted_at=NULL WHERE device_id=?').run(deviceId);
+  },
+  clearXferAlert(deviceId) {
+    db.prepare('UPDATE alert_state SET last_xfer_reason=NULL, xfer_alerted_at=NULL WHERE device_id=?').run(deviceId);
   },
 
   auditLog(username, ip, action, target, detail, success=true) {

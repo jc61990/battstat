@@ -2,7 +2,7 @@
 
 Self-hosted UPS battery health dashboard. Polls UPS devices via SNMP, displays live battery status, runtime, power readings, and diagnostic data. Supports multi-site management, role-based access control with per-role site restrictions, local users, LDAP / Active Directory authentication, and email alerting.
 
-**Current version: 1.4.0**
+**Current version: 1.5.0**
 
 ---
 
@@ -15,7 +15,8 @@ Self-hosted UPS battery health dashboard. Polls UPS devices via SNMP, displays l
 - **Multi-site** — group devices by physical location, filter dashboard by site
 - **Role-based access** — custom roles with per-permission and per-site restrictions (works for LDAP users)
 - **LDAP/AD auth** — no domain join required; maps AD groups to roles
-- **Email alerting** — SMTP alerts on critical/warning/offline status changes, with configurable reminder interval
+- **In-browser notifications** — real-time toast alerts and bell icon with dropdown on status changes via WebSocket, no OS permissions required
+- **Email alerting** — SMTP alerts on critical/warning/offline/power-event status changes, with configurable reminder interval
 - **Battery part number auto-fill** — looks up replacement part from SNMP model string
 - **Battery install date auto-fill** — reads last-replaced date from Tripp Lite NMC5 via SNMP
 - **Device drawer** — click any device for full detail: power readings, diagnostics, self-test, transfer history, IP link
@@ -270,6 +271,16 @@ sudo bash /opt/battstat/uninstall.sh --purge     # uninstall + delete DB
 ---
 
 ## Changelog
+
+### 1.5.0
+- Bell notification icon (top right) with unread badge and dropdown showing last 10 alerts — all in-browser, no OS permissions
+- Real-time toast notifications on device status changes via WebSocket — color-coded by severity, click to dismiss
+- Alerts page in sidebar with badge count showing total critical + warning + offline devices
+- Site sub-nav under Sites showing each site as a clickable item with color-coded status dot, navigates directly to filtered device view
+- False offline alert fix: requires 2 consecutive failed polls before firing, prevents false alerts from transient network blips
+- Power event / on-battery alerts: fires immediately when UPS transfers to battery due to real power events (brownout, outage, spike), excludes self-test transfers
+- Improved email HTML: card layout, color-coded headers, emoji icons per alert reason, replacement part number highlighted, power event emails show load %
+- Default to dark mode
 
 ### 1.4.0
 - Email alerting via SMTP — alerts on critical/warning/offline status changes with configurable reminders

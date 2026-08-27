@@ -188,6 +188,16 @@ apply(13, 'add_alerting', (db) => {
   `);
 });
 
+apply(14, 'add_alert_state_columns', (db) => {
+  const cols = db.prepare('PRAGMA table_info(alert_state)').all().map(c => c.name);
+  if (!cols.includes('consecutive_failures'))
+    db.exec("ALTER TABLE alert_state ADD COLUMN consecutive_failures INTEGER NOT NULL DEFAULT 0");
+  if (!cols.includes('last_xfer_reason'))
+    db.exec("ALTER TABLE alert_state ADD COLUMN last_xfer_reason TEXT");
+  if (!cols.includes('xfer_alerted_at'))
+    db.exec("ALTER TABLE alert_state ADD COLUMN xfer_alerted_at INTEGER");
+});
+
 // -- Summary -------------------------------------------------------------------
 const allMigrations = db.prepare('SELECT * FROM schema_migrations ORDER BY version').all();
 console.log(`\n[migrate] ${allMigrations.length} migration(s) recorded in schema_migrations.`);
