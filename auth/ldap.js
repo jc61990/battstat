@@ -84,7 +84,18 @@ async function authenticateLdap(username, password) {
     return { success: false, error: 'Username and password required' };
   }
 
-  const safeUsername = escLdap(username.trim());
+  // Normalize username — support three formats:
+  // 1. username         → used as-is
+  // 2. domain\username  → strip the domain\ prefix
+  // 3. username@domain  → strip the @domain suffix
+  let normalizedUsername = username.trim();
+  if (normalizedUsername.includes('\\')) {
+    normalizedUsername = normalizedUsername.split('\\').pop();
+  } else if (normalizedUsername.includes('@')) {
+    normalizedUsername = normalizedUsername.split('@')[0];
+  }
+
+  const safeUsername = escLdap(normalizedUsername);
   const filter = (cfg.search_filter || '(sAMAccountName={{username}})').replace('{{username}}', safeUsername);
 
   let serviceClient;
