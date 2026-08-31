@@ -244,7 +244,8 @@ async function runAlertCheck(pollResults) {
         if (!lastRecovery || (now - lastRecovery) > 3600) {
           const email = buildResolvedEmail(device, site, poll, 'Back on Line Power', 'UPS has transferred back to utility power');
           await fire(cfg, email, 'recovery', device.name, device.id);
-          db.prepare('UPDATE alert_state SET recovery_alerted_at=?, last_xfer_reason=NULL WHERE device_id=?').run(now, device.id);
+          db.updateAlertStateField(device.id, 'recovery_alerted_at', now);
+          db.clearAlertStateField(device.id, 'last_xfer_reason');
           state = db.getAlertState(device.id);
         }
       } else {
@@ -268,9 +269,9 @@ async function runAlertCheck(pollResults) {
           '⚠️ A failed self-test may indicate the battery needs replacement.');
         await fire(cfg, email, 'self-test fail', device.name, device.id);
       }
-      db.prepare('UPDATE alert_state SET last_self_test=? WHERE device_id=?').run('Fail', device.id);
+      db.updateAlertStateField(device.id, 'last_self_test', 'Fail');
     } else if (reachable && poll.self_test_result && poll.self_test_result !== 'Fail') {
-      db.prepare('UPDATE alert_state SET last_self_test=? WHERE device_id=?').run(poll.self_test_result, device.id);
+      db.updateAlertStateField(device.id, 'last_self_test', poll.self_test_result);
     }
 
     // ── Not charging (capacity declining) ──────────────────────────────────
@@ -280,7 +281,7 @@ async function runAlertCheck(pollResults) {
       if (lastCap !== null && lastCap !== undefined && poll.batt_capacity < lastCap - 5) {
         // Capacity dropped 5+ points since last poll
         if (!notChargingAt) {
-          db.prepare('UPDATE alert_state SET not_charging_at=? WHERE device_id=?').run(now, device.id);
+          db.updateAlertStateField(device.id, 'not_charging_at', now);
         } else if ((now - notChargingAt) > 3600 && (!state.last_alerted_at || (now - state.last_alerted_at) > reminderSec)) {
           const email = buildSimpleEmail(device, site, poll, '📉', '#d97706', 'Battery Not Charging',
             [['📉', `Capacity dropped from ${lastCap}% to ${poll.batt_capacity}%`],
@@ -289,9 +290,9 @@ async function runAlertCheck(pollResults) {
           await fire(cfg, email, 'not charging', device.name, device.id);
         }
       } else {
-        db.prepare('UPDATE alert_state SET not_charging_at=NULL WHERE device_id=?').run(device.id);
+        db.clearAlertStateField(device.id, 'not_charging_at');
       }
-      db.prepare('UPDATE alert_state SET last_capacity=? WHERE device_id=?').run(poll.batt_capacity, device.id);
+      db.updateAlertStateField(device.id, 'last_capacity', poll.batt_capacity);
       state = db.getAlertState(device.id);
     }
 
@@ -328,10 +329,10 @@ async function runAlertCheck(pollResults) {
            poll.batt_run_time  !== null ? ['⏱️', `Estimated runtime: ${poll.batt_run_time} minutes`] : null].filter(Boolean),
           '⚠️ High load increases battery drain rate and reduces runtime in the event of a power failure.');
         await fire(cfg, email, 'high load', device.name, device.id);
-        db.prepare('UPDATE alert_state SET load_alerted_at=? WHERE device_id=?').run(now, device.id);
+        db.updateAlertStateField(device.id, 'load_alerted_at', now);
         state = db.getAlertState(device.id);
       } else if (poll.output_load < threshold) {
-        db.prepare('UPDATE alert_state SET load_alerted_at=NULL WHERE device_id=?').run(device.id);
+        db.clearAlertStateField(device.id, 'load_alerted_at');
       }
     }
 
@@ -345,10 +346,10 @@ async function runAlertCheck(pollResults) {
            poll.batt_capacity !== null ? ['🔋', `Battery charge: ${poll.batt_capacity}%`] : null].filter(Boolean),
           '⚠️ Elevated temperature reduces battery life and increases the risk of failure.');
         await fire(cfg, email, 'high temp', device.name, device.id);
-        db.prepare('UPDATE alert_state SET temp_alerted_at=? WHERE device_id=?').run(now, device.id);
+        db.updateAlertStateField(device.id, 'temp_alerted_at', now);
         state = db.getAlertState(device.id);
       } else if (poll.batt_temperature < threshold) {
-        db.prepare('UPDATE alert_state SET temp_alerted_at=NULL WHERE device_id=?').run(device.id);
+        db.clearAlertStateField(device.id, 'temp_alerted_at');
       }
     }
 
@@ -365,10 +366,10 @@ async function runAlertCheck(pollResults) {
            ['📡', 'Device may be unreachable or SNMP may be misconfigured']],
           null);
         await fire(cfg, email, 'stale', device.name, device.id);
-        db.prepare('UPDATE alert_state SET stale_alerted_at=? WHERE device_id=?').run(now, device.id);
+        db.updateAlertStateField(device.id, 'stale_alerted_at', now);
         state = db.getAlertState(device.id);
       } else if ((now - lastPoll) < staleThreshold) {
-        db.prepare('UPDATE alert_state SET stale_alerted_at=NULL WHERE device_id=?').run(device.id);
+        db.clearAlertStateField(device.id, 'stale_alerted_at');
       }
     }
 

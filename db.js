@@ -501,7 +501,12 @@ module.exports = {
     ).run(dateStr, deviceId);
   },
 
-  // ── Alert history ────────────────────────────────────────────────────────────
+  updateAlertStateField(deviceId, field, value) {
+    db.prepare(`UPDATE alert_state SET ${field}=? WHERE device_id=?`).run(value, deviceId);
+  },
+  clearAlertStateField(deviceId, field) {
+    db.prepare(`UPDATE alert_state SET ${field}=NULL WHERE device_id=?`).run(deviceId);
+  },
   logAlertHistory(deviceId, eventType, detail) {
     db.prepare('INSERT INTO alert_history (device_id, event_type, detail) VALUES (?,?,?)').run(deviceId, eventType, detail || '');
     // Keep only last 50 per device
