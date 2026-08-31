@@ -192,12 +192,14 @@ function buildSimpleEmail(device, site, poll, emoji, color, title, items, note) 
   };
 }
 
-async function fire(cfg, email, label, deviceName) {
+async function fire(cfg, email, label, deviceName, deviceId) {
   try {
     await sendAlert(cfg, email.subject, email.html);
+    if (deviceId) db.logAlertHistory(deviceId, label, email.subject);
     console.log(`[alerter] ${label}: ${deviceName} — ${email.subject}`);
   } catch (e) {
     console.error(`[alerter] Failed to send ${label} for ${deviceName}:`, e.message);
+    if (deviceId) db.logAlertHistory(deviceId, `${label} (send failed)`, e.message);
   }
 }
 
@@ -231,7 +233,7 @@ async function runAlertCheck(pollResults) {
            ...(poll.batt_run_time  !== null ? [['⏱️', `Estimated runtime: ${poll.batt_run_time} minutes`]] : []),
            ...(poll.output_load    !== null ? [['📊', `Output load: ${poll.output_load}%`]] : [])],
           '⚠️ The UPS is running on battery. Check the power source immediately.');
-        await fire(cfg, email, 'power event', device.name);
+        await fire(cfg, email, 'power event', device.name, device.id);
         db.markXferAlerted(device.id, xferReason);
         state = db.getAlertState(device.id);
       }
@@ -241,7 +243,7 @@ async function runAlertCheck(pollResults) {
         const lastRecovery = state.recovery_alerted_at || 0;
         if (!lastRecovery || (now - lastRecovery) > 3600) {
           const email = buildResolvedEmail(device, site, poll, 'Back on Line Power', 'UPS has transferred back to utility power');
-          await fire(cfg, email, 'recovery', device.name);
+          await fire(cfg, email, 'recovery', device.name, device.id);
           db.prepare('UPDATE alert_state SET recovery_alerted_at=?, last_xfer_reason=NULL WHERE device_id=?').run(now, device.id);
           state = db.getAlertState(device.id);
         }
@@ -264,7 +266,7 @@ async function runAlertCheck(pollResults) {
            poll.self_test_date ? ['📅', `Test date: ${poll.self_test_date}`] : null,
            poll.batt_capacity !== null ? ['🔋', `Battery charge: ${poll.batt_capacity}%`] : null].filter(Boolean),
           '⚠️ A failed self-test may indicate the battery needs replacement.');
-        await fire(cfg, email, 'self-test fail', device.name);
+        await fire(cfg, email, 'self-test fail', device.name, device.id);
       }
       db.prepare('UPDATE alert_state SET last_self_test=? WHERE device_id=?').run('Fail', device.id);
     } else if (reachable && poll.self_test_result && poll.self_test_result !== 'Fail') {
@@ -284,7 +286,7 @@ async function runAlertCheck(pollResults) {
             [['📉', `Capacity dropped from ${lastCap}% to ${poll.batt_capacity}%`],
              poll.batt_run_time !== null ? ['⏱️', `Current runtime: ${poll.batt_run_time} minutes`] : null].filter(Boolean),
             '⚠️ The battery capacity is declining. The battery may not be charging properly.');
-          await fire(cfg, email, 'not charging', device.name);
+          await fire(cfg, email, 'not charging', device.name, device.id);
         }
       } else {
         db.prepare('UPDATE alert_state SET not_charging_at=NULL WHERE device_id=?').run(device.id);
@@ -307,7 +309,7 @@ async function runAlertCheck(pollResults) {
                ['📊', `Age: ${ageYears.toFixed(1)} years (threshold: ${maxYears} years)`],
                device.part_number ? ['🔩', `Replacement part: ${device.part_number}`] : null].filter(Boolean),
               `⚠️ This battery has exceeded the recommended replacement interval of ${maxYears} years.`);
-            await fire(cfg, email, 'battery age', device.name);
+            await fire(cfg, email, 'battery age', device.name, device.id);
             db.markAlerted(device.id, 'age');
             state = db.getAlertState(device.id);
           }
@@ -325,7 +327,7 @@ async function runAlertCheck(pollResults) {
            poll.batt_capacity !== null ? ['🔋', `Battery charge: ${poll.batt_capacity}%`] : null,
            poll.batt_run_time  !== null ? ['⏱️', `Estimated runtime: ${poll.batt_run_time} minutes`] : null].filter(Boolean),
           '⚠️ High load increases battery drain rate and reduces runtime in the event of a power failure.');
-        await fire(cfg, email, 'high load', device.name);
+        await fire(cfg, email, 'high load', device.name, device.id);
         db.prepare('UPDATE alert_state SET load_alerted_at=? WHERE device_id=?').run(now, device.id);
         state = db.getAlertState(device.id);
       } else if (poll.output_load < threshold) {
@@ -342,7 +344,7 @@ async function runAlertCheck(pollResults) {
           [['🌡️', `Battery temperature: <strong>${poll.batt_temperature}°C</strong> (threshold: ${threshold}°C)`],
            poll.batt_capacity !== null ? ['🔋', `Battery charge: ${poll.batt_capacity}%`] : null].filter(Boolean),
           '⚠️ Elevated temperature reduces battery life and increases the risk of failure.');
-        await fire(cfg, email, 'high temp', device.name);
+        await fire(cfg, email, 'high temp', device.name, device.id);
         db.prepare('UPDATE alert_state SET temp_alerted_at=? WHERE device_id=?').run(now, device.id);
         state = db.getAlertState(device.id);
       } else if (poll.batt_temperature < threshold) {
@@ -362,7 +364,7 @@ async function runAlertCheck(pollResults) {
            ['🌐', `IP: ${device.ip}`],
            ['📡', 'Device may be unreachable or SNMP may be misconfigured']],
           null);
-        await fire(cfg, email, 'stale', device.name);
+        await fire(cfg, email, 'stale', device.name, device.id);
         db.prepare('UPDATE alert_state SET stale_alerted_at=? WHERE device_id=?').run(now, device.id);
         state = db.getAlertState(device.id);
       } else if ((now - lastPoll) < staleThreshold) {
@@ -381,7 +383,7 @@ async function runAlertCheck(pollResults) {
         const prevLabel = STATUS_LABEL[state.alerted_status] || state.alerted_status;
         const email = buildResolvedEmail(device, site, poll, `Recovered from ${prevLabel}`,
           `Device is now healthy. All monitored metrics are within normal thresholds.`);
-        await fire(cfg, email, 'resolved', device.name);
+        await fire(cfg, email, 'resolved', device.name, device.id);
       }
       if (state?.alerted_status) db.clearAlertState(device.id);
       continue;

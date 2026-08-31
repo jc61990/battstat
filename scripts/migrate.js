@@ -224,6 +224,19 @@ apply(15, 'add_extended_alert_config', (db) => {
   addState('not_charging_at',   'INTEGER');
 });
 
+apply(16, 'add_alert_history', (db) => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS alert_history (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      device_id  INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+      ts         INTEGER NOT NULL DEFAULT (unixepoch()),
+      event_type TEXT NOT NULL,
+      detail     TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_alert_history_device ON alert_history(device_id, ts DESC);
+  `);
+});
+
 // -- Summary -------------------------------------------------------------------
 const allMigrations = db.prepare('SELECT * FROM schema_migrations ORDER BY version').all();
 console.log(`\n[migrate] ${allMigrations.length} migration(s) recorded in schema_migrations.`);

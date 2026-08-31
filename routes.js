@@ -129,6 +129,14 @@ router.post('/snmp/config', requirePerm('can_manage_snmp'), (req, res) => {
   } catch (e) { err(res, e.message); }
 });
 
+router.get('/devices/:id/alert-history', requireAuth, (req, res) => {
+  const d = db.getDevice(req.params.id);
+  if (!d) return err(res, 'Not found', 404);
+  const allowed = getAllowedSites(req.session);
+  if (allowed && !allowed.includes(d.site_id)) return err(res, 'Not found', 404);
+  ok(res, db.getAlertHistory(req.params.id, 10));
+});
+
 router.post('/snmp/bulk-version', requirePerm('can_manage_snmp'), (req, res) => {
   const { version } = req.body;
   const valid = ['auto', 'v3', 'v2c', 'v1'];

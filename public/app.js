@@ -772,6 +772,11 @@ function openDrawer(deviceId) {
     </div>
 
     <div class="dp-sec">
+      <div class="dp-sec-title">Alert history</div>
+      <div id="dr-alert-history" style="font-size:12px;color:var(--text3)">Loading…</div>
+    </div>
+
+    <div class="dp-sec">
       <div class="dp-sec-title">Battery life (time since install)</div>
       ${lifePct !== null ? `
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
@@ -856,6 +861,36 @@ function openDrawer(deviceId) {
 
   document.getElementById('drawer').classList.add('open');
   document.getElementById('drawer-bd').classList.add('open');
+
+  // Load alert history asynchronously
+  apiFetch(`/devices/${d.id}/alert-history`).then(history => {
+    const el = document.getElementById('dr-alert-history');
+    if (!el) return;
+    if (!history || !history.length) {
+      el.textContent = 'No alert history recorded yet.';
+      return;
+    }
+    const eventIcon = {
+      'status Critical': '🔴', 'status Warning': '🟡', 'status Offline': '⚫',
+      'power event': '⚡', 'recovery': '✅', 'resolved': '✅',
+      'self-test fail': '🧪', 'not charging': '📉', 'battery age': '🗓️',
+      'high load': '📊', 'high temp': '🌡️', 'stale': '🕐',
+    };
+    el.innerHTML = history.map(h => {
+      const icon = Object.entries(eventIcon).find(([k]) => h.event_type.includes(k))?.[1] || '📋';
+      const detail = h.detail.replace(/^BattStat [^:]+: [^ ]+ — /, ''); // strip redundant prefix
+      return `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
+        <span style="flex-shrink:0;font-size:13px">${icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(h.detail)}">${esc(detail)}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:1px">${fmtTs(h.ts)}</div>
+        </div>
+      </div>`;
+    }).join('') + (history.length >= 10 ? `<div style="font-size:11px;color:var(--text3);padding-top:5px;text-align:center">Showing last ${history.length} events</div>` : '');
+  }).catch(() => {
+    const el = document.getElementById('dr-alert-history');
+    if (el) el.textContent = 'Could not load history.';
+  });
 }
 
 function closeDrawer() {

@@ -164,6 +164,16 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_user_site_access_user ON user_site_access(user_id);
 
+  CREATE TABLE IF NOT EXISTS alert_history (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    device_id  INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+    ts         INTEGER NOT NULL DEFAULT (unixepoch()),
+    event_type TEXT NOT NULL,
+    detail     TEXT NOT NULL DEFAULT ''
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_alert_history_device ON alert_history(device_id, ts DESC);
+
   CREATE TABLE IF NOT EXISTS alert_config (
     id                      INTEGER PRIMARY KEY,
     enabled                 INTEGER NOT NULL DEFAULT 0,
@@ -489,6 +499,16 @@ module.exports = {
     db.prepare(
       "UPDATE devices SET battery_installed=?, updated_at=unixepoch() WHERE id=? AND (battery_installed IS NULL OR battery_installed='')"
     ).run(dateStr, deviceId);
+  },
+
+  // ── Alert history ────────────────────────────────────────────────────────────
+  logAlertHistory(deviceId, eventType, detail) {
+    db.prepare('INSERT INTO alert_history (device_id, event_type, detail) VALUES (?,?,?)').run(deviceId, eventType, detail || '');
+    // Keep only last 50 per device
+    db.prepare('DELETE FROM alert_history WHERE device_id=? AND id NOT IN (SELECT id FROM alert_history WHERE device_id=? ORDER BY ts DESC LIMIT 50)').run(deviceId, deviceId);
+  },
+  getAlertHistory(deviceId, limit) {
+    return db.prepare('SELECT * FROM alert_history WHERE device_id=? ORDER BY ts DESC LIMIT ?').all(deviceId, limit || 10);
   },
 
   // ── Alerting ────────────────────────────────────────────────────────────────
