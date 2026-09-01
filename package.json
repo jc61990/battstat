@@ -1,6 +1,6 @@
 {
   "name": "battstat",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "UPS Battery Health Monitor with SNMPv3",
   "main": "server.js",
   "scripts": {

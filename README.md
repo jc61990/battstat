@@ -2,7 +2,7 @@
 
 Self-hosted UPS battery health dashboard. Polls UPS devices via SNMP, displays live battery status, runtime, power readings, and diagnostic data. Supports multi-site management, role-based access control with per-role site restrictions, local users, LDAP / Active Directory authentication, and email alerting.
 
-**Current version: 1.8.1**
+**Current version: 1.8.2**
 
 ---
 
@@ -272,6 +272,9 @@ sudo bash /opt/battstat/uninstall.sh --purge     # uninstall + delete DB
 ---
 
 ## Changelog
+
+### 1.8.1
+- Fix: alerter was calling `db.prepare()` directly instead of through the db module, causing `db.prepare is not a function` error on every poll cycle. This silently broke all reminder emails, high load/temp/stale alerts, self-test tracking, and not-charging detection since they were introduced. All state updates now go through proper db methods.
 
 ### 1.8.0
 - Per-device alert history in the device drawer — shows last 10 alert events with emoji, description, and timestamp. Loads asynchronously so the drawer opens instantly. Keeps up to 50 events per device. Useful for spotting recurring failure patterns before they become critical.

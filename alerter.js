@@ -82,12 +82,16 @@ function metricsRow(poll) {
     poll.input_voltage    !== null ? [`⚡`, `${poll.input_voltage}V`, 'Input'] : null,
   ].filter(Boolean);
   if (!metrics.length) return '';
-  return `<div style="margin:0 20px 10px;display:flex;gap:6px;flex-wrap:wrap">
-    ${metrics.map(([icon,val,label]) => `<div style="background:#f3f4f6;border-radius:6px;padding:6px 10px;text-align:center;min-width:56px">
-      <div style="font-size:14px;line-height:1">${icon}</div>
-      <div style="font-size:14px;font-weight:700;color:#111;margin-top:2px">${val}</div>
-      <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em">${label}</div>
-    </div>`).join('')}
+  return `<div style="margin:0 20px 10px">
+    <table cellpadding="0" cellspacing="6" border="0" style="border-collapse:separate">
+      <tr>
+        ${metrics.map(([icon,val,label]) => `<td style="background:#f3f4f6;border-radius:6px;padding:6px 10px;text-align:center;vertical-align:top;white-space:nowrap">
+          <div style="font-size:14px;line-height:1">${icon}</div>
+          <div style="font-size:14px;font-weight:700;color:#111;margin-top:2px">${val}</div>
+          <div style="font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em">${label}</div>
+        </td>`).join('')}
+      </tr>
+    </table>
   </div>`;
 }
 
