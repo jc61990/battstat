@@ -73,13 +73,13 @@ function reasonBox(items, accentColor) {
 }
 
 function metricsRow(poll) {
-  if (!poll) return '';
+  if (!poll || !poll.reachable) return '';
   const metrics = [
-    poll.batt_capacity    !== null ? [`🔋`, `${poll.batt_capacity}%`, 'Charge'] : null,
-    poll.batt_run_time    !== null ? [`⏱️`, `${poll.batt_run_time}m`, 'Runtime'] : null,
-    poll.batt_temperature !== null ? [`🌡️`, `${poll.batt_temperature}°C`, 'Temp'] : null,
-    poll.output_load      !== null ? [`📊`, `${poll.output_load}%`, 'Load'] : null,
-    poll.input_voltage    !== null ? [`⚡`, `${poll.input_voltage}V`, 'Input'] : null,
+    (poll.batt_capacity    != null) ? [`🔋`, `${poll.batt_capacity}%`,     'Charge']  : null,
+    (poll.batt_run_time    != null) ? [`⏱️`, `${poll.batt_run_time}m`,     'Runtime'] : null,
+    (poll.batt_temperature != null) ? [`🌡️`, `${poll.batt_temperature}°C`, 'Temp']    : null,
+    (poll.output_load      != null) ? [`📊`, `${poll.output_load}%`,       'Load']    : null,
+    (poll.input_voltage    != null) ? [`⚡`, `${poll.input_voltage}V`,     'Input']   : null,
   ].filter(Boolean);
   if (!metrics.length) return '';
   return `<div style="margin:0 20px 10px">
