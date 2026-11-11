@@ -2,7 +2,7 @@
 
 Self-hosted UPS battery health dashboard. Polls UPS devices via SNMP, displays live battery status, runtime, power readings, and diagnostic data. Supports multi-site management, role-based access control with per-role site restrictions, local users, LDAP / Active Directory authentication, and email alerting.
 
-**Current version: 1.8.4**
+**Current version: 1.8.5**
 
 ---
 
@@ -272,6 +272,9 @@ sudo bash /opt/battstat/uninstall.sh --purge     # uninstall + delete DB
 ---
 
 ## Changelog
+
+### 1.8.5
+- Fix: Excel export button did nothing. The SheetJS library was loaded from a CDN, which the app's Content-Security-Policy (`script-src 'self'`) blocks. Replaced with a small built-in dependency-free `.xlsx` writer (`public/xlsx-lite.js`) served from the app itself: no external requests, no third-party code (the old SheetJS 0.18.5 also carried known CVEs). Exports keep the same columns, add a bold frozen header row, and auto-fit column widths.
 
 ### 1.8.4
 - Fix: battery age alert emails repeated every poll cycle. The weekly throttle shared a timestamp with status alerts, which was cleared each cycle for healthy devices. Battery age now has its own `age_alerted_at` timestamp (migration 17), so it fires once and then at most weekly.

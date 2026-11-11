@@ -534,8 +534,8 @@ function updateFilterButtons() {
 }
 
 function exportDevicesXlsx() {
-  if (typeof XLSX === 'undefined') {
-    toast('Export library not loaded yet, try again in a moment', 'error');
+  if (typeof XlsxLite === 'undefined') {
+    toast('Export module failed to load - hard refresh the page and try again', 'error');
     return;
   }
 
@@ -610,19 +610,8 @@ function exportDevicesXlsx() {
     };
   });
 
-  const ws = XLSX.utils.json_to_sheet(rows);
-
-  // Auto-fit column widths
-  const cols = Object.keys(rows[0] || {});
-  ws['!cols'] = cols.map(c => ({
-    wch: Math.max(c.length, ...rows.map(r => String(r[c] ?? '').length)) + 2
-  }));
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Devices');
-
   const filename = `battstat-${new Date().toISOString().slice(0,10)}.xlsx`;
-  XLSX.writeFile(wb, filename);
+  XlsxLite.downloadBlob(XlsxLite.buildXlsx(rows, 'Devices'), filename);
   toast(`Exported ${devs.length} device${devs.length !== 1 ? 's' : ''} to ${filename}`, 'success');
 }
 
