@@ -237,6 +237,11 @@ apply(16, 'add_alert_history', (db) => {
   `);
 });
 
+apply(17, 'add_age_alerted_at', (db) => {
+  const cols = db.prepare('PRAGMA table_info(alert_state)').all().map(c => c.name);
+  if (!cols.includes('age_alerted_at')) db.exec('ALTER TABLE alert_state ADD COLUMN age_alerted_at INTEGER');
+});
+
 // -- Summary -------------------------------------------------------------------
 const allMigrations = db.prepare('SELECT * FROM schema_migrations ORDER BY version').all();
 console.log(`\n[migrate] ${allMigrations.length} migration(s) recorded in schema_migrations.`);

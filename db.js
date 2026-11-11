@@ -217,7 +217,8 @@ db.exec(`
     load_alerted_at      INTEGER,
     temp_alerted_at      INTEGER,
     stale_alerted_at     INTEGER,
-    not_charging_at      INTEGER
+    not_charging_at      INTEGER,
+    age_alerted_at       INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS audit_log (

@@ -2,7 +2,7 @@
 
 Self-hosted UPS battery health dashboard. Polls UPS devices via SNMP, displays live battery status, runtime, power readings, and diagnostic data. Supports multi-site management, role-based access control with per-role site restrictions, local users, LDAP / Active Directory authentication, and email alerting.
 
-**Current version: 1.8.3**
+**Current version: 1.8.4**
 
 ---
 
@@ -272,6 +272,9 @@ sudo bash /opt/battstat/uninstall.sh --purge     # uninstall + delete DB
 ---
 
 ## Changelog
+
+### 1.8.4
+- Fix: battery age alert emails repeated every poll cycle. The weekly throttle shared a timestamp with status alerts, which was cleared each cycle for healthy devices. Battery age now has its own `age_alerted_at` timestamp (migration 17), so it fires once and then at most weekly.
 
 ### 1.8.3
 - Fix: offline device emails showed "undefined%" for all metrics — metrics row now skips entirely when device is unreachable

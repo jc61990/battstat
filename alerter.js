@@ -307,7 +307,7 @@ async function runAlertCheck(pollResults) {
         const ageYears = (Date.now() - installedDate) / (365.25 * 24 * 3600 * 1000);
         const maxYears = parseFloat(cfg.battery_age_years) || 4.0;
         if (ageYears >= maxYears) {
-          const lastAlerted = state?.last_alerted_at || 0;
+          const lastAlerted = state?.age_alerted_at || 0;
           if (!lastAlerted || (now - lastAlerted) > 7 * 86400) { // weekly reminder
             const email = buildSimpleEmail(device, site, poll, '🗓️', '#d97706', 'Battery Age Exceeded',
               [['🗓️', `Battery installed: ${device.battery_installed}`],
@@ -315,7 +315,7 @@ async function runAlertCheck(pollResults) {
                device.part_number ? ['🔩', `Replacement part: ${device.part_number}`] : null].filter(Boolean),
               `⚠️ This battery has exceeded the recommended replacement interval of ${maxYears} years.`);
             await fire(cfg, email, 'battery age', device.name, device.id);
-            db.markAlerted(device.id, 'age');
+            db.updateAlertStateField(device.id, 'age_alerted_at', now);
             state = db.getAlertState(device.id);
           }
         }
